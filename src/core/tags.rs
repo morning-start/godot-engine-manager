@@ -1,68 +1,110 @@
-pub struct Tag {
-    keywords: &'static [&'static str],
-    labels: &'static str,
+pub trait Tags {
+    fn from_keyword(keyword: &str) -> Option<Self>
+    where
+        Self: Sized;
+    fn to_keywords(&self) -> &'static [&'static str];
+    fn get_labels(&self) -> &'static str;
 }
-// 输入一个字符串，根据keywords判断是否包含
-impl Tag {
-    pub const fn new(keywords: &'static [&'static str], labels: &'static str) -> Self {
-        Self { keywords, labels }
-    }
-    pub fn is_match(&self, input: &str) -> bool {
-        self.keywords.iter().any(|keyword| input.contains(keyword))
-    }
-    pub fn get_labels(&self) -> &'static str {
-        self.labels
-    }
-    pub fn get_keywords(&self) -> &'static [&'static str] {
-        self.keywords
-    }
+
+pub enum Language {
+    CSharp,
+    GdScript,
+    ExportTemplate,
+    AARLib,
 }
-// 标签列表
-pub struct TagList {
-    tags: &'static [Tag],
-}
-impl TagList {
-    pub const fn new(tags: &'static [Tag]) -> Self {
-        Self { tags }
+impl Tags for Language {
+    fn from_keyword(keyword: &str) -> Option<Self> {
+        match keyword {
+            "mono" => Some(Self::CSharp),
+            "gdscript" => Some(Self::GdScript),
+            "export_templates" => Some(Self::ExportTemplate),
+            "aar" => Some(Self::AARLib),
+            _ => None,
+        }
     }
-    pub fn get_tags(&self) -> &'static [Tag] {
-        self.tags
+    fn to_keywords(&self) -> &'static [&'static str] {
+        match self {
+            Self::CSharp => &["mono"],
+            Self::GdScript => &["gdscript"],
+            Self::ExportTemplate => &["export_templates"],
+            Self::AARLib => &["aar"],
+        }
     }
-    pub fn get_tag_by_labels(&self, labels: &str) -> Option<&Tag> {
-        self.tags.iter().find(|tag| tag.get_labels() == labels)
-    }
-    pub fn get_tags_by_input(&self, input: &str) -> Vec<&Tag> {
-        self.tags.iter().filter(|tag| tag.is_match(input)).collect()
+    fn get_labels(&self) -> &'static str {
+        match self {
+            Self::CSharp => "C#",
+            Self::GdScript => "GdScript",
+            Self::ExportTemplate => "导出模板",
+            Self::AARLib => "AAR库",
+        }
     }
 }
 
-pub const TAGS: TagList = TagList::new(&[
-    Tag::new(&["windows"], "Windows"),
-    Tag::new(&["win64"], "Windows X86 64位"),
-    Tag::new(&["win32"], "Windows X86 32位"),
-    Tag::new(&["linux"], "Linux"),
-    Tag::new(&["x11_64", "x11.64"], "Linux X86 64位"),
-    Tag::new(&["x11_32", "x11.32"], "Linux X86 32位"),
-    Tag::new(&["headless.64", "headless_64"], "X86 64位 无头版"),
-    Tag::new(&["server.64", "server_64"], "X86 64位"),
-    Tag::new(&["macos", "osx"], "macOS"),
-    Tag::new(&["osx32"], "32位"),
-    Tag::new(&["osx64"], "64位"),
-    Tag::new(&["android_editor"], "Android"),
-    Tag::new(&["horizonos"], "Horizon"),
-    Tag::new(&["picoos"], "Pico"),
-    Tag::new(&["web_editor"], "Web编辑器"),
-    Tag::new(&["arm32"], "ARM 32位"),
-    Tag::new(&["arm64"], "ARM 64位"),
-    Tag::new(&["x86_32"], "X86 32位"),
-    Tag::new(&["x86_64"], "X86 64位"),
-    Tag::new(&["universal"], "Universal"),
-    Tag::new(&["server"], "服务器"),
-    Tag::new(&[".aar"], "AAR库"),
-    Tag::new(&[".aab"], "aab"),
-    Tag::new(&[".apk"], "apk"),
-    Tag::new(&["export_templates"], "导出模板"),
-    Tag::new(&["mono"], "C#"),
-    Tag::new(&[".tar.xz"], "源代码"),
-    Tag::new(&[".sha256"], "校验文件"),
-]);
+pub enum OS {
+    Windows,
+    Linux,
+    MacOS,
+}
+
+impl Tags for OS {
+    fn from_keyword(keyword: &str) -> Option<Self> {
+        match keyword {
+            "win" => Some(Self::Windows),
+            "linux" | "x11" => Some(Self::Linux),
+            "macos" | "osx" => Some(Self::MacOS),
+            _ => None,
+        }
+    }
+    fn to_keywords(&self) -> &'static [&'static str] {
+        match self {
+            Self::Windows => &["win"],
+            Self::Linux => &["linux", "x11"],
+            Self::MacOS => &["macos", "osx"],
+        }
+    }
+    fn get_labels(&self) -> &'static str {
+        match self {
+            Self::Windows => "Windows",
+            Self::Linux => "Linux",
+            Self::MacOS => "macOS",
+        }
+    }
+}
+
+pub enum Architecture {
+    AMD64,
+    AMD32,
+    ARM64,
+    ARM32,
+    Universal,
+}
+impl Tags for Architecture {
+    fn from_keyword(keyword: &str) -> Option<Self> {
+        match keyword {
+            "64" => Some(Self::AMD64),
+            "32" => Some(Self::AMD32),
+            "arm64" => Some(Self::ARM64),
+            "arm32" => Some(Self::ARM32),
+            "universal" => Some(Self::Universal),
+            _ => None,
+        }
+    }
+    fn to_keywords(&self) -> &'static [&'static str] {
+        match self {
+            Self::AMD64 => &["64"],
+            Self::AMD32 => &["32"],
+            Self::ARM64 => &["arm64"],
+            Self::ARM32 => &["arm32"],
+            Self::Universal => &["universal"],
+        }
+    }
+    fn get_labels(&self) -> &'static str {
+        match self {
+            Self::AMD64 => "AMD64",
+            Self::AMD32 => "AMD32",
+            Self::ARM64 => "ARM64",
+            Self::ARM32 => "ARM32",
+            Self::Universal => "Universal",
+        }
+    }
+}
