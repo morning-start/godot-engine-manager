@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Source {
     GodotHub,
     GodotEngine,
@@ -10,6 +13,21 @@ impl Source {
             Source::GodotEngine => "github.com/godotengine",
         }
     }
+    pub fn get_name(&self) -> &str {
+        match self {
+            Source::GodotHub => "GodotHub",
+            Source::GodotEngine => "GodotEngine",
+        }
+    }
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "GodotHub" => Source::GodotHub,
+            "GodotEngine" => Source::GodotEngine,
+            _ => Source::GodotHub,
+        }
+    }
+
+
 }
 
 pub fn format_url(url: &str, source: Option<Source>) -> String {

@@ -1,4 +1,5 @@
-use crate::core::config::Config as AbsConfig;
+use crate::core::config::ConfigTrait;
+use crate::core::source::Source;
 use crate::core::utils::{load_json, save_json};
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -12,20 +13,9 @@ pub struct Config {
     pub data: PathBuf,
     pub proxy: String,
     pub version: String,
-    pub use_hub: bool,
+    pub source: Source,
 }
-impl AbsConfig for Config {
-    fn get_root() -> PathBuf {
-        let gdem_root = env::var("GDEM_ROOT");
-        match gdem_root {
-            Ok(root) => PathBuf::from(root),
-            Err(_) => {
-                // 默认目录
-                let home = env::var("HOME").unwrap();
-                PathBuf::from(home).join(".gdem")
-            }
-        }
-    }
+impl ConfigTrait for Config {
     fn new(root: Option<PathBuf>) -> Self {
         let root = root.unwrap_or_else(Config::get_root);
         let home = root.join("home");
@@ -38,7 +28,19 @@ impl AbsConfig for Config {
             data,
             proxy: "".to_string(),
             version: "".to_string(),
-            use_hub: true,
+            source: Source::GodotHub,
+        }
+    }
+
+    fn get_root() -> PathBuf {
+        let gdem_root = env::var("GDEM_ROOT");
+        match gdem_root {
+            Ok(root) => PathBuf::from(root),
+            Err(_) => {
+                // 默认目录
+                let home = env::var("HOME").unwrap();
+                PathBuf::from(home).join(".gdem")
+            }
         }
     }
 
@@ -50,7 +52,8 @@ impl AbsConfig for Config {
         let data = Self::val2path(config.get("data"));
         let proxy = Self::val2str(config.get("proxy"));
         let version = Self::val2str(config.get("version"));
-        let use_hub = Self::val2bool(config.get("use_hub"));
+        let source = Self::val2str(config.get("source"));
+        let source = Source::from_str(source.as_str());
         Self {
             root,
             home,
@@ -58,8 +61,11 @@ impl AbsConfig for Config {
             data,
             proxy,
             version,
-            use_hub,
+            source: source,
         }
+    }
+    fn init_path(&self) {
+        Self::init_dir(&[&self.root, &self.home, &self.cache, &self.data]);
     }
     fn save(&self) {
         let config = serde_json::to_value(&self).unwrap();

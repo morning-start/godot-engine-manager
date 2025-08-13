@@ -1,7 +1,14 @@
-fn main() {
-    // https://godothub.atomgit.net/web/api/releases.json
-    // browser_download_url.replace("github.com/godotengine", "gitcode.com/godothub"),
-    let url = "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_mono_win64.zip";
-    let url = url.replace("github.com/godotengine", "gitcode.com/godothub");
-    println!("{}", url);
+use std::path::PathBuf;
+
+use gdem::func::config;
+use gdem::core::config::ConfigTrait;
+use gdem::func::sync;
+
+#[tokio::main]
+async fn main() {
+    let root = PathBuf::from("./debug/gdem");
+    let cfg = config::Config::new(Some(root));
+    cfg.init_path();
+    cfg.save();
+    sync::sync_data(&cfg).await;
 }

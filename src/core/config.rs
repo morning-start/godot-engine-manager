@@ -2,12 +2,13 @@ use serde_json::Value;
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 
-pub trait Config {
+pub trait ConfigTrait {
     // abstract
     fn get_root() -> PathBuf;
     fn new(root: Option<PathBuf>) -> Self;
     fn load(root: PathBuf) -> Self;
     fn save(&self);
+    fn init_path(&self);
     // mut
     fn switch_version(&mut self, version: &str);
 
