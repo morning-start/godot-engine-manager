@@ -1,22 +1,35 @@
-pub trait Tags {
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
+
+pub trait Tag {
     fn from_keyword(keyword: &str) -> Option<Self>
     where
         Self: Sized;
     fn to_keywords(&self) -> &'static [&'static str];
     fn get_labels(&self) -> &'static str;
-}
 
+    // 检查是否包含某个标签
+    fn tag_in(&self, text: &str) -> bool
+    where
+        Self: Sized,
+    {
+        let keywords = self.to_keywords();
+        if keywords.iter().any(|&k| text.contains(k)) {
+            return true;
+        }
+        false
+    }
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 pub enum Language {
     CSharp,
-    GdScript,
     ExportTemplate,
     AARLib,
 }
-impl Tags for Language {
+impl Tag for Language {
     fn from_keyword(keyword: &str) -> Option<Self> {
         match keyword {
             "mono" => Some(Self::CSharp),
-            "gdscript" => Some(Self::GdScript),
             "export_templates" => Some(Self::ExportTemplate),
             "aar" => Some(Self::AARLib),
             _ => None,
@@ -25,7 +38,6 @@ impl Tags for Language {
     fn to_keywords(&self) -> &'static [&'static str] {
         match self {
             Self::CSharp => &["mono"],
-            Self::GdScript => &["gdscript"],
             Self::ExportTemplate => &["export_templates"],
             Self::AARLib => &["aar"],
         }
@@ -33,20 +45,20 @@ impl Tags for Language {
     fn get_labels(&self) -> &'static str {
         match self {
             Self::CSharp => "C#",
-            Self::GdScript => "GdScript",
             Self::ExportTemplate => "导出模板",
             Self::AARLib => "AAR库",
         }
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 pub enum OS {
     Windows,
     Linux,
     MacOS,
 }
 
-impl Tags for OS {
+impl Tag for OS {
     fn from_keyword(keyword: &str) -> Option<Self> {
         match keyword {
             "win" => Some(Self::Windows),
@@ -71,6 +83,7 @@ impl Tags for OS {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 pub enum Architecture {
     AMD64,
     AMD32,
@@ -78,11 +91,11 @@ pub enum Architecture {
     ARM32,
     Universal,
 }
-impl Tags for Architecture {
+impl Tag for Architecture {
     fn from_keyword(keyword: &str) -> Option<Self> {
         match keyword {
-            "64" => Some(Self::AMD64),
-            "32" => Some(Self::AMD32),
+            ".64" | "_64" | "win64" | "osx64" => Some(Self::AMD64),
+            ".32" | "_32" | "win32" | "osx32" => Some(Self::AMD32),
             "arm64" => Some(Self::ARM64),
             "arm32" => Some(Self::ARM32),
             "universal" => Some(Self::Universal),
@@ -91,8 +104,8 @@ impl Tags for Architecture {
     }
     fn to_keywords(&self) -> &'static [&'static str] {
         match self {
-            Self::AMD64 => &["64"],
-            Self::AMD32 => &["32"],
+            Self::AMD64 => &[".64", "_64", "win64", "osx64"],
+            Self::AMD32 => &[".32", "_32", "win32", "osx32"],
             Self::ARM64 => &["arm64"],
             Self::ARM32 => &["arm32"],
             Self::Universal => &["universal"],
@@ -107,4 +120,25 @@ impl Tags for Architecture {
             Self::Universal => "Universal",
         }
     }
+}
+
+pub fn get_tags(text: &str) -> Vec<String> {
+    let mut tags: Vec<String> = Vec::new();
+    for lang in Language::iter() {
+        if lang.tag_in(text) {
+            tags.push(lang.get_labels().to_string());
+        }
+    }
+    for os in OS::iter() {
+        if os.tag_in(text) {
+            tags.push(os.get_labels().to_string());
+        }
+    }
+    for arch in Architecture::iter() {
+        if arch.tag_in(text) {
+            tags.push(arch.get_labels().to_string());
+        }
+    }
+
+    tags
 }

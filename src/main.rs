@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use gdem::core::tags;
 use gdem::func::config;
 use gdem::core::config::ConfigTrait;
 use gdem::func::sync;
@@ -13,5 +14,5 @@ async fn main() {
     // cfg.save();
     // sync::sync_data(&cfg).await;
     let remote_engine_map = list::list_remote_engines(&cfg.data).unwrap();
-    println!("{:?}", remote_engine_map);
+    // println!("{:?}", remote_engine_map);
 }

@@ -5,29 +5,19 @@ use std::{error::Error, option::Option, path::Path};
 /// JSON文档处理器，提供加载、查询和字段重命名功能
 #[derive(Debug, Clone)]
 pub struct DocumentHandler {
-    document: Value,
+    pub document: Vec<Value>,
 }
 
 impl DocumentHandler {
     /// 创建新的文档处理器实例
-    pub fn new(document: Value) -> Self {
+    pub fn new(document: Vec<Value>) -> Self {
         Self { document }
     }
 
     /// 从JSON文件加载数据并创建处理器实例
     pub fn load_data(file_path: &Path) -> Result<Self, Box<dyn Error>> {
         let document = load_json(file_path)?;
-        Ok(Self::new(document))
-    }
-
-    /// 获取当前文档的不可变引用
-    pub fn document(&self) -> &Value {
-        &self.document
-    }
-
-    /// 获取当前文档的可变引用
-    pub fn document_mut(&mut self) -> &mut Value {
-        &mut self.document
+        Ok(Self::new(document.as_array().unwrap().to_vec()))
     }
 }
 
@@ -40,18 +30,15 @@ impl DocumentHandler {
         }
         let key = key.unwrap();
         let value = value.unwrap();
-
-        // 确保文档是数组类型
-        let array = self.document.as_array().ok_or("Document is not an array")?;
-
         // 筛选符合条件的元素
-        let filtered: Vec<Value> = array
+        let filtered: Vec<Value> = self
+            .document
             .iter()
             .filter(|item| item.as_object().and_then(|obj| obj.get(key)) == Some(value))
             .cloned()
             .collect();
 
-        Ok(Self::new(Value::Array(filtered)))
+        Ok(Self::new(filtered))
     }
 
     /// 根据名称映射重命名字段
@@ -59,20 +46,13 @@ impl DocumentHandler {
         &mut self,
         name_map: &std::collections::HashMap<String, String>,
     ) -> Result<(), Box<dyn Error>> {
-        // 确保文档是数组类型
-        let array = self
-            .document
-            .as_array_mut()
-            .ok_or("Document is not an array")?;
-
         // 遍历每个对象并重命名字段
-        for item in array {
-            let obj = item
-                .as_object_mut()
-                .ok_or("Array element is not an object")?;
-            for (old_name, new_name) in name_map {
-                if let Some(value) = obj.remove(old_name) {
-                    obj.insert(new_name.clone(), value);
+        for item in &mut self.document {
+            if let Some(obj) = item.as_object_mut() {
+                for (old_name, new_name) in name_map {
+                    if let Some(value) = obj.remove(old_name) {
+                        obj.insert(new_name.clone(), value);
+                    }
                 }
             }
         }
@@ -81,10 +61,7 @@ impl DocumentHandler {
     }
     /// 根据指定字段顺序重排文档中的对象字段
     pub fn orderby(&mut self, levels: &[&str]) -> Result<Vec<Value>, Box<dyn Error>> {
-        let array = self
-            .document
-            .as_array_mut()
-            .ok_or("Document is not an array")?;
+        let array = &mut self.document;
         let mut new_doc = Vec::with_capacity(array.len());
 
         for item in array.drain(..) {
@@ -103,10 +80,7 @@ impl DocumentHandler {
 
     /// 根据指定键对文档进行排序
     pub fn sort(&mut self, key: &str, reverse: bool) -> Result<(), Box<dyn Error>> {
-        let array = self
-            .document
-            .as_array_mut()
-            .ok_or("Document is not an array")?;
+        let array = &mut self.document;
 
         array.sort_by(|a, b| {
             let a_val = a.as_object().and_then(|obj| obj.get(key));
@@ -132,10 +106,7 @@ impl DocumentHandler {
     where
         F: Fn(Value) -> Value,
     {
-        let array = self
-            .document
-            .as_array_mut()
-            .ok_or("Document is not an array")?;
+        let array = &mut self.document;
 
         for item in array {
             *item = f(item.take());
@@ -149,10 +120,7 @@ impl DocumentHandler {
     where
         F: Fn(Value) -> Value,
     {
-        let array = self
-            .document
-            .as_array_mut()
-            .ok_or("Document is not an array")?;
+        let array = &mut self.document;
 
         for item in array {
             if let Some(obj) = item.as_object_mut() {
@@ -166,23 +134,25 @@ impl DocumentHandler {
     }
 
     /// 根据条件筛选文档元素，返回新的处理器实例
-    pub fn filter<F>(&self, condition: F) -> Result<Self, Box<dyn Error>>
+    pub fn flitter<F>(&self, condition: F) -> Result<Self, Box<dyn Error>>
     where
         F: Fn(&Value) -> bool,
     {
-        let array = self.document.as_array().ok_or("Document is not an array")?;
+        let array = &self.document;
+
         let filtered: Vec<Value> = array
             .iter()
             .filter(|&item| condition(item))
             .cloned()
             .collect();
 
-        Ok(Self::new(Value::Array(filtered)))
+        Ok(Self::new(filtered))
     }
 
     /// 获取文档中指定字段的信息，返回新的处理器实例
     pub fn get_specific_fields(&self, fields: &[&str]) -> Result<Self, Box<dyn Error>> {
-        let array = self.document.as_array().ok_or("Document is not an array")?;
+        let array = &self.document;
+
         let mut new_doc = Vec::with_capacity(array.len());
 
         for item in array {
@@ -198,7 +168,7 @@ impl DocumentHandler {
             new_doc.push(Value::Object(new_item));
         }
 
-        Ok(Self::new(Value::Array(new_doc)))
+        Ok(Self::new(new_doc))
     }
 
     pub fn group_by<F>(&self, key: &str, agg_map: Option<F>) -> Result<Self, Box<dyn Error>>
@@ -206,7 +176,7 @@ impl DocumentHandler {
         F: Fn(Vec<Value>) -> Vec<Value>,
     {
         // 确保文档是数组类型
-        let array = self.document.as_array().ok_or("Document is not an array")?;
+        let array = &self.document;
 
         // 创建一个 HashMap 来存储分组后的数据
         let mut grouped_data: std::collections::HashMap<String, serde_json::Map<String, Value>> =
@@ -272,6 +242,6 @@ impl DocumentHandler {
         // 将分组数据转换为 Vec<Value>
         let result: Vec<Value> = grouped_data.into_values().map(Value::Object).collect();
 
-        Ok(Self::new(Value::Array(result)))
+        Ok(Self::new(result))
     }
 }
