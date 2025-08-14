@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
+use gdem::core::config::ConfigTrait;
 use gdem::core::tags;
 use gdem::func::config;
-use gdem::core::config::ConfigTrait;
-use gdem::func::sync;
 use gdem::func::list;
+use gdem::func::sync;
 
 #[tokio::main]
 async fn main() {
@@ -13,6 +13,12 @@ async fn main() {
     // cfg.init_path();
     // cfg.save();
     // sync::sync_data(&cfg).await;
-    let remote_engine_map = list::list_remote_engines(&cfg.data).unwrap();
-    // println!("{:?}", remote_engine_map);
+    let remote_engine_map = list::list_remote_engine_tags(&cfg.data, "4.4.1").unwrap();
+    let names = &remote_engine_map[0]["assets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_object().unwrap()["name"].as_str().unwrap().to_string())
+        .collect::<Vec<String>>();
+    println!("{:?}", names);
 }

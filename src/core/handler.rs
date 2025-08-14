@@ -2,19 +2,37 @@ use super::utils::load_json; // 引用项目中已有的JSON加载函数
 use serde_json::Value;
 use std::{error::Error, option::Option, path::Path};
 
-/// JSON文档处理器，提供加载、查询和字段重命名功能
+/// JSON文档处理器
+///
+/// 用于处理JSON文档的各种操作，如查询、排序、过滤等
 #[derive(Debug, Clone)]
 pub struct DocumentHandler {
     pub document: Vec<Value>,
 }
 
 impl DocumentHandler {
-    /// 创建新的文档处理器实例
+    /// 创建一个新的DocumentHandler实例
+    ///
+    /// # 参数
+    ///
+    /// * `document` - 包含JSON值的向量
+    ///
+    /// # 返回值
+    ///
+    /// 返回一个新的DocumentHandler实例
     pub fn new(document: Vec<Value>) -> Self {
         Self { document }
     }
 
-    /// 从JSON文件加载数据并创建处理器实例
+    /// 从文件加载JSON数据
+    ///
+    /// # 参数
+    ///
+    /// * `file_path` - 要加载的JSON文件的路径
+    ///
+    /// # 返回值
+    ///
+    /// 返回包含加载数据的DocumentHandler实例，如果加载失败则返回错误
     pub fn load_data(file_path: &Path) -> Result<Self, Box<dyn Error>> {
         let document = load_json(file_path)?;
         Ok(Self::new(document.as_array().unwrap().to_vec()))
@@ -22,7 +40,16 @@ impl DocumentHandler {
 }
 
 impl DocumentHandler {
-    /// 根据键值对查询数据，返回新的处理器实例
+    /// 根据键值对查询文档
+    ///
+    /// # 参数
+    ///
+    /// * `key` - 要查询的键
+    /// * `value` - 要匹配的值
+    ///
+    /// # 返回值
+    ///
+    /// 返回包含匹配项的新DocumentHandler实例
     pub fn query(&self, key: Option<&str>, value: Option<&Value>) -> Result<Self, Box<dyn Error>> {
         // 如果未提供键或值，返回当前实例的克隆
         if key.is_none() || value.is_none() {
@@ -41,7 +68,15 @@ impl DocumentHandler {
         Ok(Self::new(filtered))
     }
 
-    /// 根据名称映射重命名字段
+    /// 重命名文档中的字段
+    ///
+    /// # 参数
+    ///
+    /// * `name_map` - 旧字段名到新字段名的映射
+    ///
+    /// # 返回值
+    ///
+    /// 如果重命名成功则返回Ok，否则返回Err
     pub fn rename(
         &mut self,
         name_map: &std::collections::HashMap<String, String>,
@@ -59,7 +94,16 @@ impl DocumentHandler {
 
         Ok(())
     }
-    /// 根据指定字段顺序重排文档中的对象字段
+    
+    /// 根据指定的层级提取文档字段
+    ///
+    /// # 参数
+    ///
+    /// * `levels` - 要提取的字段层级
+    ///
+    /// # 返回值
+    ///
+    /// 返回包含提取字段的新文档
     pub fn orderby(&mut self, levels: &[&str]) -> Result<Vec<Value>, Box<dyn Error>> {
         let array = &mut self.document;
         let mut new_doc = Vec::with_capacity(array.len());
@@ -79,6 +123,15 @@ impl DocumentHandler {
     }
 
     /// 根据指定键对文档进行排序
+    ///
+    /// # 参数
+    ///
+    /// * `key` - 用于排序的键
+    /// * `reverse` - 是否逆序排列
+    ///
+    /// # 返回值
+    ///
+    /// 如果排序成功则返回Ok，否则返回Err
     pub fn sort(&mut self, key: &str, reverse: bool) -> Result<(), Box<dyn Error>> {
         let array = &mut self.document;
 
@@ -101,7 +154,15 @@ impl DocumentHandler {
         Ok(())
     }
 
-    /// 对文档中的每个元素应用转换函数
+    /// 对文档中的每个元素应用函数
+    ///
+    /// # 参数
+    ///
+    /// * `f` - 要应用的函数
+    ///
+    /// # 返回值
+    ///
+    /// 如果应用成功则返回Ok，否则返回Err
     pub fn map<F>(&mut self, f: F) -> Result<(), Box<dyn Error>>
     where
         F: Fn(Value) -> Value,
@@ -115,7 +176,16 @@ impl DocumentHandler {
         Ok(())
     }
 
-    /// 对文档中指定键的值应用转换函数
+    /// 对文档中指定键的值应用函数
+    ///
+    /// # 参数
+    ///
+    /// * `key` - 要应用函数的键
+    /// * `f` - 要应用的函数
+    ///
+    /// # 返回值
+    ///
+    /// 如果应用成功则返回Ok，否则返回Err
     pub fn apply<F>(&mut self, key: &str, f: F) -> Result<(), Box<dyn Error>>
     where
         F: Fn(Value) -> Value,
@@ -133,7 +203,15 @@ impl DocumentHandler {
         Ok(())
     }
 
-    /// 根据条件筛选文档元素，返回新的处理器实例
+    /// 根据条件过滤文档
+    ///
+    /// # 参数
+    ///
+    /// * `condition` - 过滤条件函数
+    ///
+    /// # 返回值
+    ///
+    /// 返回包含满足条件的元素的新DocumentHandler实例
     pub fn flitter<F>(&self, condition: F) -> Result<Self, Box<dyn Error>>
     where
         F: Fn(&Value) -> bool,
@@ -149,7 +227,15 @@ impl DocumentHandler {
         Ok(Self::new(filtered))
     }
 
-    /// 获取文档中指定字段的信息，返回新的处理器实例
+    /// 获取文档中的特定字段
+    ///
+    /// # 参数
+    ///
+    /// * `fields` - 要获取的字段名列表
+    ///
+    /// # 返回值
+    ///
+    /// 返回只包含指定字段的新DocumentHandler实例
     pub fn get_specific_fields(&self, fields: &[&str]) -> Result<Self, Box<dyn Error>> {
         let array = &self.document;
 
@@ -171,6 +257,16 @@ impl DocumentHandler {
         Ok(Self::new(new_doc))
     }
 
+    /// 根据指定键对文档进行分组
+    ///
+    /// # 参数
+    ///
+    /// * `key` - 用于分组的键
+    /// * `agg_map` - 可选的聚合函数
+    ///
+    /// # 返回值
+    ///
+    /// 返回分组后的DocumentHandler实例
     pub fn group_by<F>(&self, key: &str, agg_map: Option<F>) -> Result<Self, Box<dyn Error>>
     where
         F: Fn(Vec<Value>) -> Vec<Value>,

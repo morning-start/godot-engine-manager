@@ -28,11 +28,15 @@ pub enum Language {
 }
 impl Tag for Language {
     fn from_keyword(keyword: &str) -> Option<Self> {
-        match keyword {
-            "mono" => Some(Self::CSharp),
-            "export_templates" => Some(Self::ExportTemplate),
-            "aar" => Some(Self::AARLib),
-            _ => None,
+        let keyword = keyword.to_lowercase();
+        if keyword.contains("mono") {
+            Some(Self::CSharp)
+        } else if keyword.contains("export_templates") {
+            Some(Self::ExportTemplate)
+        } else if keyword.contains("aar") {
+            Some(Self::AARLib)
+        } else {
+            None
         }
     }
     fn to_keywords(&self) -> &'static [&'static str] {
@@ -58,13 +62,26 @@ pub enum OS {
     MacOS,
 }
 
+impl OS {
+    pub fn get_local_os() -> Self {
+        let sys_os = std::env::consts::OS;
+        let sys_os = sys_os.to_lowercase();
+        let os = Self::from_keyword(&sys_os).unwrap_or(Self::Windows); // 默认为Windows
+        os
+    }
+}
+
 impl Tag for OS {
     fn from_keyword(keyword: &str) -> Option<Self> {
-        match keyword {
-            "win" => Some(Self::Windows),
-            "linux" | "x11" => Some(Self::Linux),
-            "macos" | "osx" => Some(Self::MacOS),
-            _ => None,
+        let keyword = keyword.to_lowercase();
+        if keyword.contains("win") {
+            Some(Self::Windows)
+        } else if keyword.contains("linux") || keyword.contains("x11") {
+            Some(Self::Linux)
+        } else if keyword.contains("macos") || keyword.contains("osx") {
+            Some(Self::MacOS)
+        } else {
+            None
         }
     }
     fn to_keywords(&self) -> &'static [&'static str] {
@@ -91,15 +108,39 @@ pub enum Architecture {
     ARM32,
     Universal,
 }
+
+impl Architecture {
+    pub fn get_local_arch() -> Self {
+        let arch = std::env::consts::ARCH;
+        let arch = arch.to_lowercase();
+        let arch = Self::from_keyword(&arch).unwrap_or(Self::AMD64); // 默认为AMD64
+        arch
+    }
+}
+
 impl Tag for Architecture {
     fn from_keyword(keyword: &str) -> Option<Self> {
-        match keyword {
-            ".64" | "_64" | "win64" | "osx64" => Some(Self::AMD64),
-            ".32" | "_32" | "win32" | "osx32" => Some(Self::AMD32),
-            "arm64" => Some(Self::ARM64),
-            "arm32" => Some(Self::ARM32),
-            "universal" => Some(Self::Universal),
-            _ => None,
+        let keyword = keyword.to_lowercase();
+        if keyword.contains(".64")
+            || keyword.contains("_64")
+            || keyword.contains("win64")
+            || keyword.contains("osx64")
+        {
+            Some(Self::AMD64)
+        } else if keyword.contains(".32")
+            || keyword.contains("_32")
+            || keyword.contains("win32")
+            || keyword.contains("osx32")
+        {
+            Some(Self::AMD32)
+        } else if keyword.contains("arm64") {
+            Some(Self::ARM64)
+        } else if keyword.contains("arm32") {
+            Some(Self::ARM32)
+        } else if keyword.contains("universal") {
+            Some(Self::Universal)
+        } else {
+            None
         }
     }
     fn to_keywords(&self) -> &'static [&'static str] {
@@ -143,8 +184,8 @@ pub fn get_tags(text: &str) -> Vec<String> {
     tags
 }
 
-const SUPPORT_EXTENSION: &[&str] = &[".aar", ".zip", ".tar.xz", ".sha256"];
+const SUPPORT_FILE: &[&str] = &[".aar", ".zip", ".txt", ".tpz"];
 
-pub fn is_support_extension(file_name: &str) -> bool {
-    SUPPORT_EXTENSION.iter().any(|&ext| file_name.contains(ext))
+pub fn is_support_file(file_name: &str) -> bool {
+    SUPPORT_FILE.iter().any(|&ext| file_name.contains(ext))
 }

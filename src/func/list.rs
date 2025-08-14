@@ -1,4 +1,6 @@
-use crate::core::handler::{self, DocumentHandler};
+use crate::core::handler::DocumentHandler;
+use crate::core::tags::is_support_file;
+use crate::core::tags::{Architecture, OS, Tag};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -6,14 +8,14 @@ use std::error::Error;
 use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Engine {
+pub struct EngineInfo {
     pub major: String,
     pub versions: Vec<String>,
 }
 
-pub fn list_local_engines(home: &Path) -> Result<Vec<Engine>, Box<dyn Error>> {
+pub fn list_local_engines(home: &Path) -> Result<Vec<EngineInfo>, Box<dyn Error>> {
     // {'4.x':['4.0','4.1']} --> [{ 'major':'4.x','versions':['4.0','4.1']}]
-    let mut engine_list: Vec<Engine> = Vec::new();
+    let mut engine_list: Vec<EngineInfo> = Vec::new();
     // 如果 home 目录是空的，返回空的Vec
     if home.iter().next().is_none() {
         return Ok(engine_list);
@@ -33,7 +35,7 @@ pub fn list_local_engines(home: &Path) -> Result<Vec<Engine>, Box<dyn Error>> {
                     }
                 }
                 let major_name = major.file_name().unwrap().to_string_lossy().to_string();
-                engine_list.push(Engine {
+                engine_list.push(EngineInfo {
                     major: major_name,
                     versions: major_list,
                 });
@@ -51,8 +53,8 @@ pub fn list_local_engines(home: &Path) -> Result<Vec<Engine>, Box<dyn Error>> {
     }
 }
 
-pub fn list_remote_engines(data: &Path) -> Result<Vec<Engine>, Box<dyn Error>> {
-    let mut engine_list: Vec<Engine> = Vec::new();
+pub fn list_remote_engines(data: &Path) -> Result<Vec<EngineInfo>, Box<dyn Error>> {
+    let mut engine_list: Vec<EngineInfo> = Vec::new();
     let mut handler = load_remote_engines_handler(data, &["tag_name"])?;
 
     // 在document 中添加major字段
@@ -77,7 +79,7 @@ pub fn list_remote_engines(data: &Path) -> Result<Vec<Engine>, Box<dyn Error>> {
             .filter_map(|item| item.as_str())
             .map(ToString::to_string)
             .collect();
-        engine_list.push(Engine {
+        engine_list.push(EngineInfo {
             major: major.to_string(),
             versions,
         });
@@ -87,31 +89,54 @@ pub fn list_remote_engines(data: &Path) -> Result<Vec<Engine>, Box<dyn Error>> {
     Ok(engine_list)
 }
 
-// pub fn list_remote_engine_tags(
-//     data: &Path,
-//     version: &str,
-// ) -> Result<HashMap<String, Vec<String>>, Box<dyn Error>> {
-//     let mut tags_map: HashMap<String, Vec<String>> = HashMap::new();
-//     let handler = load_remote_engines_handler(data, &["tag_name", "assets"])?;
-//     //handler flitter tag_name 中 name 包含 version 的
-//     let handler = handler.flitter(|v| v["tag_name"].as_str().unwrap().contains(version))?;
-//     // 从中找到最新版本
-//     let latest_version = handler.document[0]["tag_name"]
-//         .as_str()
-//         .unwrap();
-//     // 从最新版本中找到assets
-//     let assets = handler.document[0]["assets"]
-//         .as_array()
-//         .unwrap();
-//     let assets = DocumentHandler::new(assets.clone());
-// }
+pub fn list_remote_engine_tags(data: &Path, version: &str) -> Result<Vec<Value>, Box<dyn Error>> {
+    let handler = load_remote_engines_handler(data, &["tag_name", "assets"])?;
+    //handler flitter tag_name 中 name 包含 version 的
+    let handler = handler.flitter(|v| {
+        let name = v["tag_name"].as_str().unwrap();
+        // 检查major
+        if name.starts_with(version) {
+            return true;
+        }
+        false
+    })?;
+    // 从handler 中提取assets
+    Ok(handler.document)
+}
 
 fn load_remote_engines_handler(
     data: &Path,
     fields: &[&str],
 ) -> Result<DocumentHandler, Box<dyn Error>> {
     let file_path = data.join("releases.json");
-    let handler = DocumentHandler::load_data(&file_path)?;
+    let mut handler = DocumentHandler::load_data(&file_path)?;
+    handler.apply("assets", |v| {
+        let assets = v.as_array().unwrap();
+        let assets = DocumentHandler::new(assets.clone());
+        // 对assets 字段进行删除，只保留 name size updated_at browser_download_url
+        let fields = ["name", "size", "updated_at", "browser_download_url"];
+        let assets = assets.get_specific_fields(&fields).unwrap();
+        // is_support_extension 过滤assets 中不支持的文件
+        // 只保留本机系统和架构
+        let local_os = OS::get_local_os();
+        let local_arch = Architecture::get_local_arch();
+        let assets = assets
+            .flitter(|v| {
+                let name = v["name"].as_str().unwrap();
+                let is_supported = is_support_file(name);
+                // 如果是zip，判断系统和架构
+                let mut flag = true;
+                if name.ends_with(".zip") {
+                    let is_os = local_os.tag_in(name);
+                    let is_arch = local_arch.tag_in(name);
+                    flag = is_os && is_arch;
+                }
+                flag && is_supported
+
+            })
+            .unwrap();
+        assets.document.into()
+    })?;
     let handler = handler.get_specific_fields(fields)?;
     Ok(handler)
 }
