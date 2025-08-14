@@ -142,3 +142,9 @@ pub fn get_tags(text: &str) -> Vec<String> {
 
     tags
 }
+
+const SUPPORT_EXTENSION: &[&str] = &[".aar", ".zip", ".tar.xz", ".sha256"];
+
+pub fn is_support_extension(file_name: &str) -> bool {
+    SUPPORT_EXTENSION.iter().any(|&ext| file_name.contains(ext))
+}
