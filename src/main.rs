@@ -18,5 +18,5 @@ async fn main() {
         .iter()
         .map(|v| v.as_object().unwrap()["name"].as_str().unwrap().to_string())
         .collect::<Vec<String>>();
-    println!("{:?}", names);
+    println!("{:?}", remote_engine_map);
 }

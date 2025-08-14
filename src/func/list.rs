@@ -1,6 +1,7 @@
 use crate::core::handler::DocumentHandler;
 use crate::core::tags::is_support_file;
 use crate::core::tags::{Architecture, OS, Tag};
+use crate::core::utils::format_size;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -102,8 +103,25 @@ pub fn list_remote_engine_tags(data: &Path, version: &str) -> Result<Vec<Value>,
     })?;
     // 从handler 中提取assets
     let latest_assets = handler.document.first().unwrap();
-    let assets = latest_assets["assets"].as_array().unwrap().clone();
-    Ok(assets)
+    let latest_assets = latest_assets["assets"].as_array().unwrap().clone();
+
+    let latest_assets = DocumentHandler::new(latest_assets);
+    let mut assets = latest_assets.get_specific_fields(&["name", "size", "updated_at"])?;
+
+    // 对size进行处理，计算为字符串 KB、MB 或 GB
+    for item in assets.document.iter_mut() {
+        let size = item["size"].as_u64().unwrap() as f64;
+        let size = format_size(size);
+        item["size"] = size.into();
+    }
+    // updated_at 格式化为 2023-01-01 的格式
+    for item in assets.document.iter_mut() {
+        let updated_at = item["updated_at"].as_str().unwrap();
+        let updated_at = updated_at.split("T").collect::<Vec<&str>>()[0];
+        item["updated_at"] = updated_at.into();
+    }
+
+    Ok(assets.document)
 }
 
 fn load_remote_engines_handler(
@@ -134,7 +152,6 @@ fn load_remote_engines_handler(
                     flag = is_os && is_arch;
                 }
                 flag && is_supported
-
             })
             .unwrap();
         assets.document.into()
@@ -148,3 +165,4 @@ fn get_major(tag_name: &str) -> String {
     let major = major.collect::<Vec<&str>>()[0];
     format!("{}.x", major)
 }
+

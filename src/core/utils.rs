@@ -258,3 +258,26 @@ pub fn move_and_clean_subfolder(target_folder: &Path) -> Result<bool, Box<dyn st
         Ok(false)
     }
 }
+
+
+
+/// 将字节大小格式化为人类可读的字符串表示
+///
+/// # Arguments
+///
+/// * `size` - 以字节为单位的大小值
+///
+/// # Returns
+///
+/// * `String` - 格式化后的大小字符串，包含适当的单位（B, KB, MB, GB）
+pub fn format_size(size: f64) -> String {
+    if size > 1024.0 * 1024.0 * 1024.0 {
+        format!("{:.2}GB", size / 1024.0 / 1024.0 / 1024.0)
+    } else if size > 1024.0 * 1024.0 {
+        format!("{:.2}MB", size / 1024.0 / 1024.0)
+    } else if size > 1024.0 {
+        format!("{:.2}KB", size / 1024.0)
+    } else {
+        format!("{}B", size)
+    }
+}
