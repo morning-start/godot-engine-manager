@@ -101,7 +101,9 @@ pub fn list_remote_engine_tags(data: &Path, version: &str) -> Result<Vec<Value>,
         false
     })?;
     // 从handler 中提取assets
-    Ok(handler.document)
+    let latest_assets = handler.document.first().unwrap();
+    let assets = latest_assets["assets"].as_array().unwrap().clone();
+    Ok(assets)
 }
 
 fn load_remote_engines_handler(

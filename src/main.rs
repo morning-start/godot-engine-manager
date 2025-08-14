@@ -13,10 +13,8 @@ async fn main() {
     // cfg.init_path();
     // cfg.save();
     // sync::sync_data(&cfg).await;
-    let remote_engine_map = list::list_remote_engine_tags(&cfg.data, "4.4.1").unwrap();
-    let names = &remote_engine_map[0]["assets"]
-        .as_array()
-        .unwrap()
+    let remote_engine_map = list::list_remote_engine_tags(&cfg.data, "4").unwrap();
+    let names = &remote_engine_map
         .iter()
         .map(|v| v.as_object().unwrap()["name"].as_str().unwrap().to_string())
         .collect::<Vec<String>>();
