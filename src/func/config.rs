@@ -44,7 +44,8 @@ impl ConfigTrait for Config {
         }
     }
 
-    fn load(root: PathBuf) -> Self {
+    fn load() -> Self {
+        let root = Self::get_root();
         let config = load_json(&root.join("config.json")).unwrap();
         let root = Self::val2path(config.get("root"));
         let home = Self::val2path(config.get("home"));
