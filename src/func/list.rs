@@ -1,11 +1,13 @@
 use crate::core::handler::DocumentHandler;
 use crate::core::utils::format_size;
 use crate::func::tool::{get_major_from_tag, load_remote_engines_handler};
+use serde::de::value;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
+use tabled::grid::records::IntoRecords;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EngineInfo {
@@ -13,12 +15,12 @@ pub struct EngineInfo {
     pub versions: Vec<String>,
 }
 
-pub fn list_local_engines(home: &Path) -> Result<Vec<EngineInfo>, Box<dyn Error>> {
+pub fn list_local_engines(home: &Path) -> Result<Vec<Value>, Box<dyn Error>> {
     // {'4.x':['4.0','4.1']} --> [{ 'major':'4.x','versions':['4.0','4.1']}]
-    let mut engine_list: Vec<EngineInfo> = Vec::new();
+    let mut engine_list: Vec<Value> = Vec::new();
     // 如果 home 目录是空的，返回空的Vec
     if home.iter().next().is_none() {
-        return Ok(engine_list);
+        return Ok(Vec::new());
     } else {
         // 遍历 home 目录下的所有文件
         // home/major/version
@@ -26,35 +28,46 @@ pub fn list_local_engines(home: &Path) -> Result<Vec<EngineInfo>, Box<dyn Error>
             let major = major?.path();
             let mut major_list: Vec<String> = Vec::new();
             if major.is_dir() {
-                // 迭代子目录
+                // 迭代 version 子目录
                 for version in major.read_dir()? {
                     let version = version?.path();
                     if version.is_dir() {
-                        let dir_name = version.file_name().unwrap().to_string_lossy().to_string();
-                        major_list.push(dir_name);
+                        let engine_dir_names = version
+                            .read_dir()?
+                            .iter_rows()
+                            .map(|v| v.unwrap().file_name().to_string_lossy().to_string())
+                            .collect::<Vec<String>>();
+                        major_list = engine_dir_names;
                     }
                 }
                 let major_name = major.file_name().unwrap().to_string_lossy().to_string();
-                engine_list.push(EngineInfo {
-                    major: major_name,
-                    versions: major_list,
-                });
+                engine_list.push(json!({
+                    "major": major_name,
+                    "engines": major_list,
+                }));
             }
         }
         // 如果version 为空，删除该元素
-        engine_list.retain(|v| !v.versions.is_empty());
+        engine_list.retain(|v| !v["engines"].as_array().unwrap().is_empty());
         // 对每个Vec<String> 进行倒叙排序
         for v in engine_list.iter_mut() {
-            v.versions.sort_by(|a, b| b.cmp(a));
+            v["engines"]
+                .as_array_mut()
+                .unwrap()
+                .sort_by(|a, b| b.as_str().unwrap().cmp(a.as_str().unwrap()));
         }
         // 对每个major 进行倒叙排序
-        engine_list.sort_by(|a, b| b.major.cmp(&a.major));
+        engine_list.sort_by(|a, b| {
+            b["major"]
+                .as_str()
+                .unwrap()
+                .cmp(a["major"].as_str().unwrap())
+        });
         return Ok(engine_list);
     }
 }
 
-pub fn list_remote_engines(data: &Path) -> Result<Vec<EngineInfo>, Box<dyn Error>> {
-    let mut engine_list: Vec<EngineInfo> = Vec::new();
+pub fn list_remote_engines(data: &Path) -> Result<Vec<Value>, Box<dyn Error>> {
     let mut handler = load_remote_engines_handler(data, &["tag_name"])?;
 
     // 在document 中添加major字段
@@ -71,22 +84,9 @@ pub fn list_remote_engines(data: &Path) -> Result<Vec<EngineInfo>, Box<dyn Error
     major_handler.rename(&name_map)?;
 
     // 遍历major_handler 中的每个元素
-    for obj in major_handler.document.iter() {
-        let major = obj["major"].as_str().unwrap();
-        let val_list = obj["versions"].as_array().unwrap();
-        let versions = val_list
-            .iter()
-            .filter_map(|item| item.as_str())
-            .map(ToString::to_string)
-            .collect();
-        engine_list.push(EngineInfo {
-            major: major.to_string(),
-            versions,
-        });
-    }
 
     // 遍历handler 中的每个元素
-    Ok(engine_list)
+    Ok(major_handler.document)
 }
 
 /// 列出远程引擎的资产信息
