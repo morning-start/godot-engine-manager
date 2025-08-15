@@ -4,7 +4,7 @@ use crate::core::utils::symlink;
 use crate::func::tool::{format_engine_name, get_levels_dir};
 use std::error::Error;
 
-pub fn switch_engine(engine: &str, cfg: &mut Config) -> Result<bool, Box<dyn Error>> {
+pub fn switch_engine(engine: &str, cfg: &mut Config) -> Result<String, Box<dyn Error>> {
     let link_path = cfg.root.join("default");
     let home_dir = get_levels_dir(&cfg.home, engine);
     // filename 去除zip和exe
@@ -17,5 +17,6 @@ pub fn switch_engine(engine: &str, cfg: &mut Config) -> Result<bool, Box<dyn Err
     }
     cfg.switch_version(&engine);
     cfg.save();
-    Ok(true)
+    Ok(engine)
+
 }

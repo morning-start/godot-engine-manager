@@ -168,7 +168,7 @@ pub async fn full_install_process(
     cfg: &Config,
     force: bool,
     skip_check: bool,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<String, Box<dyn Error>> {
     let proxy_url = if cfg.proxy.is_empty() {
         None
     } else {
@@ -204,9 +204,9 @@ pub async fn full_install_process(
     let home_dir = get_levels_dir(&cfg.home, engine);
     // filename 去除zip和exe
     let file_name = format_engine_name(engine);
-    let data_path = home_dir.join(file_name);
+    let data_path = home_dir.join(&file_name);
     extract_engine(&file_path, &data_path)?;
     pd.finish_with_message("Extracting done");
 
-    Ok(())
+    Ok(file_name)
 }
