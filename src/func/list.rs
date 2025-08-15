@@ -39,29 +39,10 @@ pub fn list_local_engines(home: &Path) -> Result<Vec<Value>, Box<dyn Error>> {
                         major_list = engine_dir_names;
                     }
                 }
-                let major_name = major.file_name().unwrap().to_string_lossy().to_string();
-                engine_list.push(json!({
-                    "major": major_name,
-                    "engines": major_list,
-                }));
+                engine_list.extend_from_slice(json!(major_list).as_array().unwrap());
+
             }
         }
-        // 如果version 为空，删除该元素
-        engine_list.retain(|v| !v["engines"].as_array().unwrap().is_empty());
-        // 对每个Vec<String> 进行倒叙排序
-        for v in engine_list.iter_mut() {
-            v["engines"]
-                .as_array_mut()
-                .unwrap()
-                .sort_by(|a, b| b.as_str().unwrap().cmp(a.as_str().unwrap()));
-        }
-        // 对每个major 进行倒叙排序
-        engine_list.sort_by(|a, b| {
-            b["major"]
-                .as_str()
-                .unwrap()
-                .cmp(a["major"].as_str().unwrap())
-        });
         return Ok(engine_list);
     }
 }
