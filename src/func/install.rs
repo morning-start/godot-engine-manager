@@ -1,13 +1,12 @@
-use tokio::fs::remove_file;
-
 use crate::core::source::format_url;
 use crate::core::style::new_spinner;
 use crate::core::utils::{download_file, extract_zip, promote_if_single_subdir, sha512sum};
-use crate::func::tool::{format_engine_name, get_levels_dir, load_remote_engine_assets};
 use crate::func::config::Config;
+use crate::func::tool::{format_engine_name, get_levels_dir, load_remote_engine_assets};
 use std::error::Error;
 use std::fs;
 use std::path::Path;
+use tokio::fs::remove_file;
 
 fn query_url(file_name: &str, data: &Path) -> Result<String, Box<dyn Error>> {
     let assets = load_remote_engine_assets(file_name, data)?;
@@ -40,7 +39,6 @@ fn query_sum_file_url(file_name: &str, data: &Path) -> Result<String, Box<dyn Er
 
     Ok(url)
 }
-
 
 async fn get_remote_sha512(
     file_name: &str,
@@ -89,11 +87,19 @@ async fn check_sha512(
     Ok(remote_sha512 == local_sha512)
 }
 
-async fn install_engine(file_name: &str, cfg: &Config) -> Result<String, Box<dyn Error>> {
+async fn install_engine(
+    file_name: &str,
+    cfg: &Config,
+    force: bool,
+) -> Result<String, Box<dyn Error>> {
     let cache_dir = get_levels_dir(&cfg.cache, file_name);
     let file_path = cache_dir.join(file_name);
     if file_path.exists() {
-        return Ok(format!("{} exists", file_name));
+        if force {
+            remove_file(&file_path).await?;
+        } else {
+            return Ok(format!("{} exists", file_name));
+        }
     }
 
     // 获取下载链接
@@ -157,7 +163,12 @@ pub fn extract_engine(
 ///     Ok(())
 /// }
 /// ```
-pub async fn full_install_process(engine: &str, cfg: &Config) -> Result<(), Box<dyn Error>> {
+pub async fn full_install_process(
+    engine: &str,
+    cfg: &Config,
+    force: bool,
+    skip_check: bool,
+) -> Result<(), Box<dyn Error>> {
     let proxy_url = if cfg.proxy.is_empty() {
         None
     } else {
@@ -168,20 +179,23 @@ pub async fn full_install_process(engine: &str, cfg: &Config) -> Result<(), Box<
 
     // 下载引擎
     pb.set_message("Downloading");
-    let msg = install_engine(engine, cfg).await?;
+    let msg = install_engine(engine, cfg, force).await?;
+
     pb.set_message(msg);
 
     // 检查sum
-    pb.set_message("Checking sum");
-
-    let check = check_sha512(engine, cfg, proxy_url).await?;
-    if !check {
-        let cache_dir = get_levels_dir(&cfg.cache, engine);
-        let file_path = cache_dir.join(engine);
-        remove_file(file_path).await?;
-        pb.finish_with_message("Checksum failed, file removed");
+    if !skip_check {
+        let pb = new_spinner();
+        pb.set_message("Checking sum");
+        let check = check_sha512(engine, cfg, proxy_url).await?;
+        if !check {
+            let cache_dir = get_levels_dir(&cfg.cache, engine);
+            let file_path = cache_dir.join(engine);
+            remove_file(file_path).await?;
+            pb.finish_with_message("Checksum failed, file removed");
+        }
+        pb.finish_with_message("Checksum passed");
     }
-    pb.finish_with_message("Checksum passed");
 
     let pd = new_spinner();
     pd.set_message("Extracting");

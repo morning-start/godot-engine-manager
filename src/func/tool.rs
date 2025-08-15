@@ -1,8 +1,8 @@
-use regex::Regex;
 use crate::core::handler::DocumentHandler;
 use crate::core::tags::is_support_file;
 use crate::core::tags::{Architecture, OS, Tag};
 use crate::core::utils::format_size;
+use regex::Regex;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -11,7 +11,6 @@ pub fn format_engine_name(engine: &str) -> String {
     let file_name: String = engine.replace(".zip", "").replace(".exe", "");
     file_name
 }
-
 
 pub fn get_levels_dir(root: &Path, engine: &str) -> PathBuf {
     let version = extract_version(engine).unwrap();
@@ -38,8 +37,6 @@ pub fn extract_version(engine: &str) -> Option<String> {
     re.captures(engine)
         .map(|captures| captures.get(1).unwrap().as_str().to_string())
 }
-
-
 
 pub fn load_remote_engines_handler(
     data: &Path,
@@ -77,7 +74,6 @@ pub fn load_remote_engines_handler(
     Ok(handler)
 }
 
-
 /// 从tag_name 中提取major 版本号
 ///
 /// # Arguments
@@ -101,8 +97,6 @@ pub fn get_major_from_tag(tag_name: &str) -> String {
     let major = major.collect::<Vec<&str>>()[0];
     format!("{}.x", major)
 }
-
-
 
 /// 加载远程引擎资源并处理数据格式
 ///
