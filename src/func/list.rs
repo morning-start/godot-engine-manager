@@ -1,17 +1,10 @@
 use crate::core::handler::DocumentHandler;
 use crate::core::utils::format_size;
 use crate::func::tool::{get_major_from_tag, load_remote_engines_handler};
-use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct EngineInfo {
-    pub major: String,
-    pub versions: Vec<String>,
-}
 
 pub fn list_local_engines(home: &Path) -> Result<Vec<Value>, Box<dyn Error>> {
     // 如果 home 目录不存在或无法读取，返回空的Vec
