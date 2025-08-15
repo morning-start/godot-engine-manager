@@ -195,10 +195,10 @@ pub async fn full_install_process(file_name: &str, cfg: &Config) -> Result<(), B
     pd.set_message("Extracting");
     let cache_dir = get_cache_dir(&cfg.cache, file_name);
     let file_path = cache_dir.join(file_name);
-    let data_dir = get_cache_dir(&cfg.data, file_name);
+    let home_dir = get_cache_dir(&cfg.home, file_name);
     // filename 去除zip和exe
     let file_name: String = file_name.replace(".zip", "").replace(".exe", "");
-    let data_path = data_dir.join(file_name);
+    let data_path = home_dir.join(file_name);
     extract_engine(&file_path, &data_path)?;
     pd.finish_with_message("Extracting done");
 
