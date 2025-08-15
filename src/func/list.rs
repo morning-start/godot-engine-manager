@@ -6,7 +6,6 @@ use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
-use tabled::grid::records::IntoRecords;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EngineInfo {
@@ -15,36 +14,60 @@ pub struct EngineInfo {
 }
 
 pub fn list_local_engines(home: &Path) -> Result<Vec<Value>, Box<dyn Error>> {
-    // {'4.x':['4.0','4.1']} --> [{ 'major':'4.x','versions':['4.0','4.1']}]
+    // 如果 home 目录不存在或无法读取，返回空的Vec
     let mut engine_list: Vec<Value> = Vec::new();
-    // 如果 home 目录是空的，返回空的Vec
-    if home.iter().next().is_none() {
-        return Ok(Vec::new());
-    } else {
-        // 遍历 home 目录下的所有文件
-        // home/major/version
-        for major in home.read_dir()? {
-            let major = major?.path();
-            let mut major_list: Vec<String> = Vec::new();
-            if major.is_dir() {
-                // 迭代 version 子目录
-                for version in major.read_dir()? {
-                    let version = version?.path();
-                    if version.is_dir() {
-                        let engine_dir_names = version
-                            .read_dir()?
-                            .iter_rows()
-                            .map(|v| v.unwrap().file_name().to_string_lossy().to_string())
-                            .collect::<Vec<String>>();
-                        major_list = engine_dir_names;
-                    }
-                }
-                engine_list.extend_from_slice(json!(major_list).as_array().unwrap());
 
-            }
+    // 尝试读取主目录，如果失败则返回空列表
+    let major_entries = match home.read_dir() {
+        Ok(entries) => entries,
+        Err(_) => return Ok(Vec::new()),
+    };
+
+    // 遍历主版本目录 (如 4.x, 3.x)
+    for major_entry in major_entries {
+        let major_path = major_entry?.path();
+
+        // 确保是目录
+        if !major_path.is_dir() {
+            continue;
         }
-        return Ok(engine_list);
+
+        // 读取版本目录
+        let version_entries = match major_path.read_dir() {
+            Ok(entries) => entries,
+            Err(_) => continue, // 如果无法读取版本目录，跳过这个主版本
+        };
+
+        // 遍历版本目录 (如 4.0, 4.1)
+        for version_entry in version_entries {
+            let version_path = version_entry?.path();
+
+            // 确保是目录
+            if !version_path.is_dir() {
+                continue;
+            }
+
+            // 获取引擎目录名称
+            let engine_dir_names: Vec<String> = version_path
+                .read_dir()?
+                .filter_map(|entry| {
+                    entry.ok().and_then(|e| {
+                        let path = e.path();
+                        if path.is_dir() {
+                            Some(e.file_name().to_string_lossy().to_string())
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect();
+
+            // 将引擎目录名称添加到结果列表
+            engine_list.extend_from_slice(json!(engine_dir_names).as_array().unwrap());
+        }
     }
+
+    Ok(engine_list)
 }
 
 pub fn list_remote_engines(data: &Path) -> Result<Vec<Value>, Box<dyn Error>> {
