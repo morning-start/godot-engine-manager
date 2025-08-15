@@ -4,4 +4,4 @@ pub mod list;
 pub mod install;
 pub mod tool;
 pub mod switch;
-pub mod uninstall;
+pub mod remove;
