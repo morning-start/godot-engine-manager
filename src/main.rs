@@ -101,19 +101,23 @@ async fn main() {
             // 如果都为None，则列出所有本地引擎
             if !remote && version.is_none() {
                 let res = list::list_local_engines(&cfg.home).unwrap();
-                let table = style::show_table(&res, "Local Engines");
+                let current = cfg.version.clone();
+                let table = style::show_tree(&res, current.as_ref(), "Local Engines");
                 println!("{}", table);
             } else if !remote && version.is_some() {
                 let res =
                     list::list_remote_engine_assets(&cfg.data, version.as_ref().unwrap()).unwrap();
-                let table = style::show_table(&res, "Remote Engine Assets");
+                let table = style::show_list(&res, "Remote Engine Assets");
                 println!("{}", table);
             } else if remote && version.is_none() {
                 let res = list::list_remote_engines(&cfg.data).unwrap();
-                let table = style::show_table(&res, "Remote Engines");
+                let table = style::show_list(&res, "Remote Engines");
                 println!("{}", table);
             } else {
-                eprintln!("Invalid arguments");
+                let res =
+                    list::list_remote_engines_major(&cfg.data, version.as_ref().unwrap()).unwrap();
+                let table = style::show_list(&res, "Remote Engines");
+                println!("{}", table);
             }
         }
         Commands::Install {

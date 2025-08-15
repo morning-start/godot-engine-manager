@@ -1,14 +1,13 @@
 use crate::core::handler::DocumentHandler;
 use crate::core::utils::format_size;
 use crate::func::tool::{get_major_from_tag, load_remote_engines_handler};
-use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
 
-pub fn list_local_engines(home: &Path) -> Result<Vec<Value>, Box<dyn Error>> {
+pub fn list_local_engines(home: &Path) -> Result<Vec<String>, Box<dyn Error>> {
     // 如果 home 目录不存在或无法读取，返回空的Vec
-    let mut engine_list: Vec<Value> = Vec::new();
+    let mut engine_list: Vec<String> = Vec::new();
 
     // 尝试读取主目录，如果失败则返回空列表
     let major_entries = match home.read_dir() {
@@ -56,14 +55,14 @@ pub fn list_local_engines(home: &Path) -> Result<Vec<Value>, Box<dyn Error>> {
                 .collect();
 
             // 将引擎目录名称添加到结果列表
-            engine_list.extend_from_slice(json!(engine_dir_names).as_array().unwrap());
+            engine_list.extend_from_slice(engine_dir_names.as_slice());
         }
     }
 
     Ok(engine_list)
 }
 
-pub fn list_remote_engines(data: &Path) -> Result<Vec<Value>, Box<dyn Error>> {
+pub fn list_remote_engines(data: &Path) -> Result<Vec<String>, Box<dyn Error>> {
     let mut handler = load_remote_engines_handler(data, &["tag_name"])?;
 
     // 在document 中添加major字段
@@ -79,10 +78,66 @@ pub fn list_remote_engines(data: &Path) -> Result<Vec<Value>, Box<dyn Error>> {
     let name_map = HashMap::from([("tag_name".to_string(), "versions".to_string())]);
     major_handler.rename(&name_map)?;
 
-    // 遍历major_handler 中的每个元素
+    // 只获取最新版本的数据
+    // major_handler.document[0]["versions"].as_array().unwrap().to_vec()
+    // 获取max 版本
+    let max_major = major_handler.document.iter().max_by_key(|v| {
+        let major = v["major"].as_str().unwrap();
+        let major = major.chars().nth(0).unwrap();
+        let major = major.to_digit(10).unwrap();
+        major
+    });
 
-    // 遍历handler 中的每个元素
-    Ok(major_handler.document)
+    let max_major = max_major.unwrap();
+    let latest_versions = max_major["versions"]
+        .as_array()
+        .unwrap()
+        .to_vec();
+
+    let latest_versions: Vec<String> = latest_versions
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
+    Ok(latest_versions)
+}
+
+pub fn list_remote_engines_major(
+    data: &Path,
+    version: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
+    let mut handler = load_remote_engines_handler(data, &["tag_name"])?;
+
+    // 在document 中添加major字段
+    for item in handler.document.iter_mut() {
+        let tag_name = item["tag_name"].as_str().unwrap();
+        let major = get_major_from_tag(tag_name);
+        item["major"] = major.into();
+    }
+    // group by major
+    let mut major_handler = handler
+        .group_by("major", Some(|val_list| val_list))
+        .unwrap();
+    let name_map = HashMap::from([("tag_name".to_string(), "versions".to_string())]);
+    major_handler.rename(&name_map)?;
+    let major_v = &version.chars().nth(0).unwrap();
+    let major_v = format!("{}.x", major_v);
+    // 找到major_v 对应的元素
+    let major_val = major_handler.document.iter().find(|v| {
+        let major = v["major"].as_str().unwrap();
+        major == major_v
+    });
+    if major_val.is_none() {
+        return Ok(Vec::new());
+    }
+    let major_val = major_val.unwrap();
+    let versions = major_val["versions"].as_array().unwrap().clone();
+    // 遍历versions 中的每个元素
+    let versions: Vec<String> = versions
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
+
+    Ok(versions)
 }
 
 /// 列出远程引擎的资产信息
@@ -108,7 +163,10 @@ pub fn list_remote_engines(data: &Path) -> Result<Vec<Value>, Box<dyn Error>> {
 /// 5. 格式化size字段为人类可读的KB/MB/GB格式
 /// 6. 格式化updated_at字段为YYYY-MM-DD格式
 /// 7. 过滤掉以.txt结尾的文件项
-pub fn list_remote_engine_assets(data: &Path, version: &str) -> Result<Vec<Value>, Box<dyn Error>> {
+pub fn list_remote_engine_assets(
+    data: &Path,
+    version: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
     let handler = load_remote_engines_handler(data, &["tag_name", "assets"])?;
     //handler flitter tag_name 中 name 包含 version 的
     let handler = handler.flitter(|v| {
@@ -147,5 +205,10 @@ pub fn list_remote_engine_assets(data: &Path, version: &str) -> Result<Vec<Value
         true
     })?;
 
-    Ok(assets.document)
+    let assets: Vec<String> = assets
+        .document
+        .iter()
+        .map(|v| v["name"].as_str().unwrap().to_string())
+        .collect();
+    Ok(assets)
 }

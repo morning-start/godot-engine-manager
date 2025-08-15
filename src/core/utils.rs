@@ -198,7 +198,7 @@ pub fn load_json(file_path: &Path) -> Result<Value, Box<dyn std::error::Error>> 
 
 // 创建系统链接，适配多个系统
 pub fn symlink(original: &Path, link: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Create link: {} -> {}", original.display(), link.display());
+    // println!("Create link: {} -> {}", original.display(), link.display());
     // // 清理现有的 链接或目录
     if link.exists() {
         if link.is_dir() {

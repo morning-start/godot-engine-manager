@@ -19,7 +19,6 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 zip = "4.3.0"
 tar = "0.4.43"
 flate2 = { version = "1.0.35", features = ["zlib"] }
-tabled = "0.20.0"
 console = "0.16.0"
 colored = "3.0.0"
 regex = "1.11.1"
