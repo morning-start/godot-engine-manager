@@ -1,6 +1,14 @@
 use colored::*;
+use indicatif::{ProgressBar, ProgressStyle};
 use serde_json::Value;
 use tabled::{builder::Builder, settings::style::Style};
+
+pub fn new_spinner() -> ProgressBar {
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(ProgressStyle::default_spinner());
+    pb.enable_steady_tick(std::time::Duration::from_millis(80));
+    pb
+}
 
 pub fn show_table(data: &Vec<Value>, title: &str) -> String {
     if data.is_empty() {

@@ -23,6 +23,7 @@ async fn main() {
         .map(|v| v.as_object().unwrap()["name"].as_str().unwrap().to_string())
         .collect::<Vec<String>>();
     println!("{:?}", names);
-    // full_install_process(names[5].as_str(), &cfg).await.unwrap();
+    full_install_process(names[4].as_str(), &cfg).await.unwrap();
+    full_install_process(names[5].as_str(), &cfg).await.unwrap();
 
 }

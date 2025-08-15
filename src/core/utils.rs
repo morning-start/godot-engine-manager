@@ -3,7 +3,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest::ClientBuilder;
 use ring::digest::{Context, SHA256, SHA512};
 use serde_json::Value;
-use std::fs::{File, read_dir, read_to_string, remove_dir, remove_dir_all, remove_file, rename};
+use std::fs::{self, read_dir, read_to_string, remove_dir, remove_dir_all, remove_file, rename, File};
 use std::io::{self, Read, Write};
 use std::path::Path;
 use tar::Archive;
@@ -327,4 +327,50 @@ pub fn format_size(size: f64) -> String {
     } else {
         format!("{}B", size)
     }
+}
+
+pub fn promote_if_single_subdir(target_folder: &Path) -> io::Result<()> {
+    if !target_folder.is_dir() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotADirectory,
+            "目标路径不是目录",
+        ));
+    }
+
+    let entries: Vec<fs::DirEntry> = fs::read_dir(target_folder)?
+        .filter_map(|res| res.ok())
+        .filter(|entry| {
+            // 可选：忽略隐藏文件（以 . 开头）
+            let name = entry.file_name();
+            if let Some(name_str) = name.to_str() {
+                !name_str.starts_with('.')
+            } else {
+                true // 无法转成字符串的也保留
+            }
+        })
+        .collect();
+
+    // 检查可见条目数量
+    if entries.len() == 1 {
+        let entry = &entries[0];
+        let inner_path = entry.path();
+
+        if inner_path.is_dir() {
+            let parent_dir = target_folder;
+
+            // 将 inner_path 中的所有内容移动到 parent_dir
+            for inner_entry in fs::read_dir(&inner_path)? {
+                let inner_entry = inner_entry?;
+                let src_path = inner_entry.path();
+                let dst_path = parent_dir.join(inner_entry.file_name());
+
+                fs::rename(src_path, dst_path)?;
+            }
+
+            // 删除空的原目录
+            fs::remove_dir(&inner_path)?;
+        }
+    }
+
+    Ok(())
 }

@@ -1,12 +1,12 @@
-use indicatif::{ProgressBar, ProgressStyle};
 use tokio::fs::remove_file;
 
 use crate::core::source::format_url;
-use crate::core::utils::{download_file, sha512sum};
+use crate::core::style::new_spinner;
+use crate::core::utils::{download_file, extract_zip, promote_if_single_subdir, sha512sum};
 use crate::func::tool::{get_major_from_tag, load_remote_engine_assets};
 use crate::func::{config::Config, tool::extract_version};
 use std::error::Error;
-use std::fs::{create_dir_all, read_to_string};
+use std::fs;
 use std::path::{Path, PathBuf};
 
 fn query_url(file_name: &str, data: &Path) -> Result<String, Box<dyn Error>> {
@@ -40,12 +40,12 @@ fn query_sum_file_url(file_name: &str, data: &Path) -> Result<String, Box<dyn Er
 
     Ok(url)
 }
-fn get_cache_dir(cfg: &Config, file_name: &str) -> PathBuf {
+fn get_cache_dir(root: &Path, file_name: &str) -> PathBuf {
     let version = extract_version(file_name).unwrap();
     let major = get_major_from_tag(version.as_str());
-    let cache_dir = cfg.cache.join(major).join(version);
+    let cache_dir = root.join(major).join(version);
     if !cache_dir.exists() {
-        create_dir_all(&cache_dir).unwrap();
+        fs::create_dir_all(&cache_dir).unwrap();
     }
     cache_dir
 }
@@ -55,7 +55,7 @@ async fn get_remote_sha512(
     cfg: &Config,
     proxy_url: Option<&str>,
 ) -> Result<String, Box<dyn Error>> {
-    let cache_dir = get_cache_dir(cfg, file_name);
+    let cache_dir = get_cache_dir(&cfg.cache, file_name);
     let sum_url = query_sum_file_url(file_name, &cfg.data).unwrap();
     let source = cfg.source.clone();
     let sum_url = format_url(sum_url.as_str(), Some(source));
@@ -71,7 +71,7 @@ async fn get_remote_sha512(
         }
     }
     // 读取sum_file_path
-    let sum_text = read_to_string(&sum_file_path)?;
+    let sum_text = fs::read_to_string(&sum_file_path)?;
 
     // 从sum_text中查找对应文件名的sha512值
     for line in sum_text.lines() {
@@ -91,14 +91,14 @@ async fn check_sha512(
     cfg: &Config,
     proxy_url: Option<&str>,
 ) -> Result<bool, Box<dyn Error>> {
-    let cache_dir = get_cache_dir(cfg, file_name);
+    let cache_dir = get_cache_dir(&cfg.cache, file_name);
     let remote_sha512 = get_remote_sha512(file_name, cfg, proxy_url).await?;
     let local_sha512 = sha512sum(cache_dir.join(file_name))?;
     Ok(remote_sha512 == local_sha512)
 }
 
 async fn install_engine(file_name: &str, cfg: &Config) -> Result<String, Box<dyn Error>> {
-    let cache_dir = get_cache_dir(cfg, file_name);
+    let cache_dir = get_cache_dir(&cfg.cache, file_name);
     let file_path = cache_dir.join(file_name);
     if file_path.exists() {
         return Ok(format!("{} exists", file_name));
@@ -124,7 +124,18 @@ async fn install_engine(file_name: &str, cfg: &Config) -> Result<String, Box<dyn
     Ok(format!("{} download success", file_name))
 }
 
-
+pub fn extract_engine(
+    package_path: &Path,
+    target_folder: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // 确保目标文件夹存在
+    std::fs::create_dir_all(target_folder)?;
+    extract_zip(package_path, target_folder)?;
+    // 智能解压，如果target_folder中只有一个文件夹，则优化文件结构
+    //  target_folder/a/  =>  target_folder/
+    promote_if_single_subdir(target_folder)?;
+    Ok(())
+}
 
 /// 完整的引擎安装流程，包括下载和校验
 ///
@@ -161,10 +172,8 @@ pub async fn full_install_process(file_name: &str, cfg: &Config) -> Result<(), B
         Some(cfg.proxy.as_str())
     };
     // 获取下载链接
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(ProgressStyle::default_spinner());
-    pb.enable_steady_tick(std::time::Duration::from_millis(80));
-    
+    let pb = new_spinner();
+
     // 下载引擎
     pb.set_message("Downloading");
     let msg = install_engine(file_name, cfg).await?;
@@ -175,11 +184,23 @@ pub async fn full_install_process(file_name: &str, cfg: &Config) -> Result<(), B
 
     let check = check_sha512(file_name, cfg, proxy_url).await?;
     if !check {
-        let cache_dir = get_cache_dir(cfg, file_name);
+        let cache_dir = get_cache_dir(&cfg.cache, file_name);
         let file_path = cache_dir.join(file_name);
         remove_file(file_path).await?;
         pb.finish_with_message("Checksum failed, file removed");
     }
     pb.finish_with_message("Checksum passed");
+
+    let pd = new_spinner();
+    pd.set_message("Extracting");
+    let cache_dir = get_cache_dir(&cfg.cache, file_name);
+    let file_path = cache_dir.join(file_name);
+    let data_dir = get_cache_dir(&cfg.data, file_name);
+    // filename 去除zip和exe
+    let file_name: String = file_name.replace(".zip", "").replace(".exe", "");
+    let data_path = data_dir.join(file_name);
+    extract_engine(&file_path, &data_path)?;
+    pd.finish_with_message("Extracting done");
+
     Ok(())
 }
