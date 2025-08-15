@@ -1,7 +1,6 @@
 use crate::core::handler::DocumentHandler;
-use crate::core::tags::is_support_file;
-use crate::core::tags::{Architecture, OS, Tag};
 use crate::core::utils::format_size;
+use crate::func::tool::{get_major_from_tag, load_remote_engines_handler};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -61,7 +60,7 @@ pub fn list_remote_engines(data: &Path) -> Result<Vec<EngineInfo>, Box<dyn Error
     // 在document 中添加major字段
     for item in handler.document.iter_mut() {
         let tag_name = item["tag_name"].as_str().unwrap();
-        let major = get_major(tag_name);
+        let major = get_major_from_tag(tag_name);
         item["major"] = major.into();
     }
     // group by major
@@ -90,7 +89,30 @@ pub fn list_remote_engines(data: &Path) -> Result<Vec<EngineInfo>, Box<dyn Error
     Ok(engine_list)
 }
 
-pub fn list_remote_engine_tags(data: &Path, version: &str) -> Result<Vec<Value>, Box<dyn Error>> {
+/// 列出远程引擎的资产信息
+///
+/// 该函数从远程数据源加载指定版本的引擎资产信息，并对数据进行处理和格式化。
+/// 处理过程包括：筛选指定版本的资产、提取特定字段、格式化文件大小和更新时间、过滤掉文本文件。
+///
+/// # Arguments
+///
+/// * `data` - 包含releases.json文件的目录路径
+/// * `version` - 要查询的引擎版本号，例如"4.4-stable" 或 "4.4.1"
+///
+/// # Returns
+///
+/// * `Result<Vec<Value>, Box<dyn Error>>` - 成功时返回处理后的资产信息列表，失败时返回错误信息
+///
+/// # Process
+///
+/// 1. 使用load_remote_engines_handler加载包含tag_name和assets字段的远程数据
+/// 2. 筛选出tag_name以指定version开头的记录
+/// 3. 提取第一条记录的assets数组
+/// 4. 从assets中提取name、size、updated_at三个字段
+/// 5. 格式化size字段为人类可读的KB/MB/GB格式
+/// 6. 格式化updated_at字段为YYYY-MM-DD格式
+/// 7. 过滤掉以.txt结尾的文件项
+pub fn list_remote_engine_assets(data: &Path, version: &str) -> Result<Vec<Value>, Box<dyn Error>> {
     let handler = load_remote_engines_handler(data, &["tag_name", "assets"])?;
     //handler flitter tag_name 中 name 包含 version 的
     let handler = handler.flitter(|v| {
@@ -120,49 +142,14 @@ pub fn list_remote_engine_tags(data: &Path, version: &str) -> Result<Vec<Value>,
         let updated_at = updated_at.split("T").collect::<Vec<&str>>()[0];
         item["updated_at"] = updated_at.into();
     }
+    // 过滤掉 name 字段 以txt结尾
+    let assets = assets.flitter(|v| {
+        let name = v["name"].as_str().unwrap();
+        if name.ends_with(".txt") {
+            return false;
+        }
+        true
+    })?;
 
     Ok(assets.document)
 }
-
-fn load_remote_engines_handler(
-    data: &Path,
-    fields: &[&str],
-) -> Result<DocumentHandler, Box<dyn Error>> {
-    let file_path = data.join("releases.json");
-    let mut handler = DocumentHandler::load_data(&file_path)?;
-    handler.apply("assets", |v| {
-        let assets = v.as_array().unwrap();
-        let assets = DocumentHandler::new(assets.clone());
-        // 对assets 字段进行删除，只保留 name size updated_at browser_download_url
-        let fields = ["name", "size", "updated_at", "browser_download_url"];
-        let assets = assets.get_specific_fields(&fields).unwrap();
-        // is_support_extension 过滤assets 中不支持的文件
-        // 只保留本机系统和架构
-        let local_os = OS::get_local_os();
-        let local_arch = Architecture::get_local_arch();
-        let assets = assets
-            .flitter(|v| {
-                let name = v["name"].as_str().unwrap();
-                let is_supported = is_support_file(name);
-                // 如果是zip，判断系统和架构
-                let mut flag = true;
-                if name.ends_with(".zip") {
-                    let is_os = local_os.tag_in(name);
-                    let is_arch = local_arch.tag_in(name);
-                    flag = is_os && is_arch;
-                }
-                flag && is_supported
-            })
-            .unwrap();
-        assets.document.into()
-    })?;
-    let handler = handler.get_specific_fields(fields)?;
-    Ok(handler)
-}
-
-fn get_major(tag_name: &str) -> String {
-    let major = tag_name.split(".");
-    let major = major.collect::<Vec<&str>>()[0];
-    format!("{}.x", major)
-}
-

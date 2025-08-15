@@ -3,8 +3,12 @@ use std::path::PathBuf;
 use gdem::core::config::ConfigTrait;
 use gdem::core::tags;
 use gdem::func::config;
+use gdem::func::install::full_install_process;
 use gdem::func::list;
 use gdem::func::sync;
+use gdem::func::tool::extract_version;
+
+
 
 #[tokio::main]
 async fn main() {
@@ -13,10 +17,12 @@ async fn main() {
     // cfg.init_path();
     // cfg.save();
     // sync::sync_data(&cfg).await;
-    let remote_engine_map = list::list_remote_engine_tags(&cfg.data, "4").unwrap();
+    let remote_engine_map = list::list_remote_engine_assets(&cfg.data, "4.4").unwrap();
     let names = &remote_engine_map
         .iter()
         .map(|v| v.as_object().unwrap()["name"].as_str().unwrap().to_string())
         .collect::<Vec<String>>();
-    println!("{:?}", remote_engine_map);
+    println!("{:?}", names);
+    // full_install_process(names[5].as_str(), &cfg).await.unwrap();
+
 }

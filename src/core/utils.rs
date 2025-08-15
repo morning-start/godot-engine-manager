@@ -1,7 +1,7 @@
 use flate2::read::GzDecoder;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest::ClientBuilder;
-use ring::digest::{Context, SHA256};
+use ring::digest::{Context, SHA256, SHA512};
 use serde_json::Value;
 use std::fs::{File, read_dir, read_to_string, remove_dir, remove_dir_all, remove_file, rename};
 use std::io::{self, Read, Write};
@@ -61,6 +61,33 @@ pub fn build_client(proxy_url: Option<&str>) -> Result<reqwest::Client, reqwest:
 
     builder.build()
 }
+/// 异步下载文件到指定路径，并显示下载进度
+///
+/// # Arguments
+///
+/// * `uri` - 要下载的文件的URL
+/// * `file_path` - 保存文件的本地路径
+/// * `proxy_url` - 可选的代理URL
+///
+/// # Returns
+///
+/// * `Result<(), Box<dyn std::error::Error + Send + Sync>>` - 下载结果，成功返回Ok(())，失败返回错误信息
+///
+/// # Example
+///
+/// ```
+/// use godot_engine_manager::core::utils::download_file;
+/// use std::path::Path;
+///
+/// let uri = "https://downloads.tuxfamily.org/godotengine/4.0/Godot_v4.0-stable_win64.zip";
+/// let file_path = Path::new("Godot_v4.0-stable_win64.zip");
+/// let proxy_url = Some("http://127.0.0.1:7890");
+///
+/// download_file(uri, file_path, proxy_url).await.unwrap();
+/// ```
+
+///
+
 pub async fn download_file(
     uri: &str,
     file_path: &Path,
@@ -116,6 +143,28 @@ pub fn sha256sum<P: AsRef<Path>>(file_path: P) -> io::Result<String> {
     let path = file_path.as_ref();
     let mut file = File::open(path)?;
     let mut context = Context::new(&SHA256);
+    let mut buffer = [0u8; 4096];
+
+    loop {
+        let n = file.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+        context.update(&buffer[..n]);
+    }
+
+    let digest = context.finish();
+    Ok(digest
+        .as_ref()
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect())
+}
+
+pub fn sha512sum<P: AsRef<Path>>(file_path: P) -> io::Result<String> {
+    let path = file_path.as_ref();
+    let mut file = File::open(path)?;
+    let mut context = Context::new(&SHA512);
     let mut buffer = [0u8; 4096];
 
     loop {
@@ -258,8 +307,6 @@ pub fn move_and_clean_subfolder(target_folder: &Path) -> Result<bool, Box<dyn st
         Ok(false)
     }
 }
-
-
 
 /// 将字节大小格式化为人类可读的字符串表示
 ///
