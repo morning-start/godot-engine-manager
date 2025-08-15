@@ -27,6 +27,6 @@ async fn main() {
         .collect::<Vec<String>>();
     // println!("{:?}", names);
     // full_install_process(names[4].as_str(), &cfg).await.unwrap();
-    // full_install_process(names[5].as_str(), &cfg).await.unwrap();
-    switch_engine(names[5].as_str(), &mut cfg).unwrap();
+    full_install_process(names[5].as_str(), &cfg).await.unwrap();
+    // uninstall_engine(names[5].as_str(), &mut cfg).unwrap();
 }
