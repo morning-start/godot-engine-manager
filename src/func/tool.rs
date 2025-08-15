@@ -4,8 +4,24 @@ use crate::core::tags::is_support_file;
 use crate::core::tags::{Architecture, OS, Tag};
 use crate::core::utils::format_size;
 use std::error::Error;
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 
+pub fn format_engine_name(engine: &str) -> String {
+    let file_name: String = engine.replace(".zip", "").replace(".exe", "");
+    file_name
+}
+
+
+pub fn get_levels_dir(root: &Path, engine: &str) -> PathBuf {
+    let version = extract_version(engine).unwrap();
+    let major = get_major_from_tag(version.as_str());
+    let l_dir = root.join(major).join(version);
+    if !l_dir.exists() {
+        fs::create_dir_all(&l_dir).unwrap();
+    }
+    l_dir
+}
 
 /// 从文件名中提取版本号
 ///
@@ -16,10 +32,10 @@ use std::path::Path;
 /// # Returns
 ///
 /// * `Option<String>` - 提取到的版本号，如果未找到则返回 None
-pub fn extract_version(file_name: &str) -> Option<String> {
+pub fn extract_version(engine: &str) -> Option<String> {
     // 匹配两种版本格式：4.4.1 和 4.4
     let re = Regex::new(r#"(\d+\.\d+(?:\.\d+)?)"#).unwrap();
-    re.captures(file_name)
+    re.captures(engine)
         .map(|captures| captures.get(1).unwrap().as_str().to_string())
 }
 

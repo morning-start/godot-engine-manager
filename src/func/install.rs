@@ -3,11 +3,11 @@ use tokio::fs::remove_file;
 use crate::core::source::format_url;
 use crate::core::style::new_spinner;
 use crate::core::utils::{download_file, extract_zip, promote_if_single_subdir, sha512sum};
-use crate::func::tool::{get_major_from_tag, load_remote_engine_assets};
-use crate::func::{config::Config, tool::extract_version};
+use crate::func::tool::{format_engine_name, get_levels_dir, load_remote_engine_assets};
+use crate::func::config::Config;
 use std::error::Error;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 fn query_url(file_name: &str, data: &Path) -> Result<String, Box<dyn Error>> {
     let assets = load_remote_engine_assets(file_name, data)?;
@@ -40,22 +40,14 @@ fn query_sum_file_url(file_name: &str, data: &Path) -> Result<String, Box<dyn Er
 
     Ok(url)
 }
-fn get_cache_dir(root: &Path, file_name: &str) -> PathBuf {
-    let version = extract_version(file_name).unwrap();
-    let major = get_major_from_tag(version.as_str());
-    let cache_dir = root.join(major).join(version);
-    if !cache_dir.exists() {
-        fs::create_dir_all(&cache_dir).unwrap();
-    }
-    cache_dir
-}
+
 
 async fn get_remote_sha512(
     file_name: &str,
     cfg: &Config,
     proxy_url: Option<&str>,
 ) -> Result<String, Box<dyn Error>> {
-    let cache_dir = get_cache_dir(&cfg.cache, file_name);
+    let cache_dir = get_levels_dir(&cfg.cache, file_name);
     let sum_url = query_sum_file_url(file_name, &cfg.data).unwrap();
     let source = cfg.source.clone();
     let sum_url = format_url(sum_url.as_str(), Some(source));
@@ -91,14 +83,14 @@ async fn check_sha512(
     cfg: &Config,
     proxy_url: Option<&str>,
 ) -> Result<bool, Box<dyn Error>> {
-    let cache_dir = get_cache_dir(&cfg.cache, file_name);
+    let cache_dir = get_levels_dir(&cfg.cache, file_name);
     let remote_sha512 = get_remote_sha512(file_name, cfg, proxy_url).await?;
     let local_sha512 = sha512sum(cache_dir.join(file_name))?;
     Ok(remote_sha512 == local_sha512)
 }
 
 async fn install_engine(file_name: &str, cfg: &Config) -> Result<String, Box<dyn Error>> {
-    let cache_dir = get_cache_dir(&cfg.cache, file_name);
+    let cache_dir = get_levels_dir(&cfg.cache, file_name);
     let file_path = cache_dir.join(file_name);
     if file_path.exists() {
         return Ok(format!("{} exists", file_name));
@@ -159,13 +151,13 @@ pub fn extract_engine(
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let file_name = "Godot_v4.4.1-stable_win64.exe.zip";
+///     let engine = "Godot_v4.4.1-stable_win64.exe.zip";
 ///     let cfg = Config::load()?;
-///     full_install_process(file_name, &cfg).await?;
+///     full_install_process(engine, &cfg).await?;
 ///     Ok(())
 /// }
 /// ```
-pub async fn full_install_process(file_name: &str, cfg: &Config) -> Result<(), Box<dyn Error>> {
+pub async fn full_install_process(engine: &str, cfg: &Config) -> Result<(), Box<dyn Error>> {
     let proxy_url = if cfg.proxy.is_empty() {
         None
     } else {
@@ -176,16 +168,16 @@ pub async fn full_install_process(file_name: &str, cfg: &Config) -> Result<(), B
 
     // 下载引擎
     pb.set_message("Downloading");
-    let msg = install_engine(file_name, cfg).await?;
+    let msg = install_engine(engine, cfg).await?;
     pb.set_message(msg);
 
     // 检查sum
     pb.set_message("Checking sum");
 
-    let check = check_sha512(file_name, cfg, proxy_url).await?;
+    let check = check_sha512(engine, cfg, proxy_url).await?;
     if !check {
-        let cache_dir = get_cache_dir(&cfg.cache, file_name);
-        let file_path = cache_dir.join(file_name);
+        let cache_dir = get_levels_dir(&cfg.cache, engine);
+        let file_path = cache_dir.join(engine);
         remove_file(file_path).await?;
         pb.finish_with_message("Checksum failed, file removed");
     }
@@ -193,11 +185,11 @@ pub async fn full_install_process(file_name: &str, cfg: &Config) -> Result<(), B
 
     let pd = new_spinner();
     pd.set_message("Extracting");
-    let cache_dir = get_cache_dir(&cfg.cache, file_name);
-    let file_path = cache_dir.join(file_name);
-    let home_dir = get_cache_dir(&cfg.home, file_name);
+    let cache_dir = get_levels_dir(&cfg.cache, engine);
+    let file_path = cache_dir.join(engine);
+    let home_dir = get_levels_dir(&cfg.home, engine);
     // filename 去除zip和exe
-    let file_name: String = file_name.replace(".zip", "").replace(".exe", "");
+    let file_name = format_engine_name(engine);
     let data_path = home_dir.join(file_name);
     extract_engine(&file_path, &data_path)?;
     pd.finish_with_message("Extracting done");

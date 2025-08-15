@@ -3,7 +3,9 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest::ClientBuilder;
 use ring::digest::{Context, SHA256, SHA512};
 use serde_json::Value;
-use std::fs::{self, read_dir, read_to_string, remove_dir, remove_dir_all, remove_file, rename, File};
+use std::fs::{
+    self, File, read_dir, read_to_string, remove_dir, remove_dir_all, remove_file, rename,
+};
 use std::io::{self, Read, Write};
 use std::path::Path;
 use tar::Archive;
@@ -195,8 +197,17 @@ pub fn load_json(file_path: &Path) -> Result<Value, Box<dyn std::error::Error>> 
 }
 
 // 创建系统链接，适配多个系统
-pub fn link(original: &Path, link: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    // println!("Create link: {} -> {}", original.display(), link.display());
+pub fn symlink(original: &Path, link: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Create link: {} -> {}", original.display(), link.display());
+    // // 清理现有的 链接或目录
+    if link.exists() {
+        if link.is_dir() {
+            fs::remove_dir_all(link)?;
+        } else {
+            fs::remove_file(link)?;
+        }
+    }
+
     if link.exists() {
         remove_file(link)?;
     }
