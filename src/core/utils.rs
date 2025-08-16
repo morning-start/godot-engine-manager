@@ -90,21 +90,12 @@ pub fn build_client(proxy_url: Option<&str>) -> Result<reqwest::Client, reqwest:
 
 ///
 
-pub async fn download_file(
+/// 获取远程文件的总大小
+async fn get_remote_file_size(
+    client: &reqwest::Client,
     uri: &str,
-    file_path: &Path,
-    proxy_url: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let client = build_client(proxy_url)?;
-
-    // 检查本地已存在的文件大小
-    let start_pos = if file_path.exists() {
-        let metadata = tokio::fs::metadata(file_path).await?;
-        metadata.len()
-    } else {
-        0
-    };
-
+    start_pos: u64,
+) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
     // 构建请求，添加Range头以支持断点续传
     let request = client.get(uri);
     let request = if start_pos > 0 {
@@ -114,8 +105,6 @@ pub async fn download_file(
     };
 
     let response = request.send().await?;
-    // let response= response.error_for_status()?;
-
     let total_size = response
         .headers()
         .get("content-length")
@@ -144,6 +133,41 @@ pub async fn download_file(
         total_size
     };
 
+    Ok(total_size)
+}
+
+pub async fn download_file(
+    uri: &str,
+    file_path: &Path,
+    proxy_url: Option<&str>,
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    let client = build_client(proxy_url)?;
+
+    // 检查本地已存在的文件大小
+    let start_pos = if file_path.exists() {
+        let metadata = tokio::fs::metadata(file_path).await?;
+        metadata.len()
+    } else {
+        0
+    };
+
+    // 获取远程文件总大小
+    let total_size = get_remote_file_size(&client, uri, start_pos).await?;
+
+    // 如果本地文件已完全下载，则直接返回
+    if start_pos == total_size && total_size > 0 {
+        return Ok("File already downloaded".to_string());
+    }
+
+    // 重新发送请求以获取响应流
+    let request = client.get(uri);
+    let request = if start_pos > 0 {
+        request.header("Range", format!("bytes={}-", start_pos))
+    } else {
+        request
+    };
+    let response = request.send().await?;
+
     let m = MultiProgress::new();
     let pb = m.add(ProgressBar::new(total_size));
     pb.set_style(
@@ -166,7 +190,7 @@ pub async fn download_file(
     } else {
         TokioFile::create(file_path).await?
     };
-    
+
     let mut stream = response.bytes_stream();
     let mut downloaded: u64 = start_pos;
 
@@ -181,7 +205,8 @@ pub async fn download_file(
     file.flush().await?;
     pb.finish_with_message("✓");
 
-    Ok(())
+    Ok("Download completed".to_string())
+
 }
 
 /// 计算文件的 SHA-256 哈希，返回十六进制字符串

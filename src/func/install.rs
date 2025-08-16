@@ -2,7 +2,10 @@ use crate::core::source::format_url;
 use crate::core::style::new_spinner;
 use crate::core::utils::{download_file, extract_zip, promote_if_single_subdir, sha512sum};
 use crate::func::config::Config;
-use crate::func::tool::{format_engine_name, get_levels_dir, load_remote_engine_assets};
+use crate::func::list::list_remote_engine_assets;
+use crate::func::tool::{
+    extract_version, format_engine_name, get_levels_dir, load_remote_engine_assets,
+};
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -53,11 +56,11 @@ async fn get_remote_sha512(
     let sum_file_path = cache_dir.join("SHA512-SUMS.txt");
     // 如果sum_file_path 不存在
     if !sum_file_path.exists() {
-        if download_file(sum_url.as_str(), &sum_file_path.as_path(), proxy_url)
-            .await
-            .is_err()
-        {
-            return Err("Download failed".into());
+        match download_file(sum_url.as_str(), &sum_file_path.as_path(), proxy_url).await {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(e);
+            }
         }
     }
     // 读取sum_file_path
@@ -101,14 +104,10 @@ async fn install_engine(file_name: &str, cfg: &Config) -> Result<String, Box<dyn
     } else {
         Some(cfg.proxy.as_str())
     };
-    if download_file(url.as_str(), &file_path.as_path(), proxy_url)
-        .await
-        .is_err()
-    {
-        return Err("Download failed".into());
+    match download_file(url.as_str(), &file_path.as_path(), proxy_url).await {
+        Ok(msg) => Ok(format!("{} {}", file_name, msg)),
+        Err(e) => Err(e),
     }
-
-    Ok(format!("{} download success", file_name))
 }
 
 pub fn extract_engine(
@@ -164,6 +163,10 @@ pub async fn full_install_process(
     } else {
         Some(cfg.proxy.as_str())
     };
+    let version = extract_version(engine).unwrap();
+    let assets = list_remote_engine_assets(&cfg.data, &version).unwrap();
+    let engine = assets.iter().find(|a| a.starts_with(engine)).unwrap();
+
     let cache_dir = get_levels_dir(&cfg.cache, engine);
     let file_path = cache_dir.join(engine);
     let file_name = format_engine_name(engine);
@@ -171,14 +174,14 @@ pub async fn full_install_process(
         if force {
             remove_file(&file_path).await?;
         }
-    } // 获取下载链接
-    let pb = new_spinner();
+    }
 
+    // 获取下载链接
+    let pb = new_spinner();
     // 下载引擎
     pb.set_message("Downloading");
-    let msg = install_engine(engine, cfg).await?;
-
-    pb.set_message(msg);
+    let msg = install_engine(engine, cfg).await.unwrap();
+    pb.finish_with_message(msg);
 
     // 检查sum
     if !skip_check {
@@ -194,7 +197,7 @@ pub async fn full_install_process(
         pb.finish_with_message("Checksum passed");
     }
 
-    if file_path.ends_with(".zip") {
+    if file_path.to_string_lossy().ends_with(".zip") {
         let pd = new_spinner();
         pd.set_message("Extracting");
         let home_dir = get_levels_dir(&cfg.home, engine);
@@ -206,6 +209,12 @@ pub async fn full_install_process(
             // 在data_path中创建一个 _sc_ 空文件
             let sc_file_path = data_path.join("_sc_");
             fs::File::create(sc_file_path)?;
+        }else {
+            // 如果存在_sc_文件，删除
+            let sc_file_path = data_path.join("_sc_");
+            if sc_file_path.exists() {
+                fs::remove_file(sc_file_path)?;
+            }
         }
     }
 
