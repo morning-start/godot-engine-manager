@@ -117,12 +117,9 @@ pub fn link_appdata(data: &PathBuf) {
 
     if appdata.exists() {
         // 使用复制和删除替代重命名，以支持跨磁盘移动
-        if appdata.is_dir() {
+        if !appdata.is_symlink() {
             copy_dir_recursively(&appdata, &data_path).unwrap();
             std::fs::remove_dir_all(&appdata).unwrap();
-        } else {
-            std::fs::copy(&appdata, &data_path).unwrap();
-            std::fs::remove_file(&appdata).unwrap();
         }
     }
     if !data_path.exists() {
