@@ -1,8 +1,10 @@
 use crate::core::config::ConfigTrait;
 use crate::core::source::Source;
-use crate::core::utils::{load_json, save_json};
+use crate::core::utils::{load_json, save_json, symlink};
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::fs;
+use std::io;
 use std::path::PathBuf;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -75,4 +77,56 @@ impl ConfigTrait for Config {
     fn switch_version(&mut self, version: &str) {
         self.version = version.to_string();
     }
+}
+
+
+/// 递归复制目录
+///
+/// # Arguments
+/// * `src` - 源目录路径
+/// * `dst` - 目标目录路径
+///
+/// # Returns
+/// * `Result<(), io::Error>` - 复制结果
+fn copy_dir_recursively(src: &PathBuf, dst: &PathBuf) -> Result<(), io::Error> {
+    if !dst.exists() {
+        fs::create_dir_all(dst)?;
+    }
+
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if file_type.is_dir() {
+            copy_dir_recursively(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn link_appdata(data: &PathBuf) {
+    let appdata = env::var("APPDATA").unwrap();
+    let appdata = PathBuf::from(appdata);
+    let appdata = appdata.join("Godot");
+    let data_path = data.join("Godot");
+
+    if appdata.exists() {
+        // 使用复制和删除替代重命名，以支持跨磁盘移动
+        if appdata.is_dir() {
+            copy_dir_recursively(&appdata, &data_path).unwrap();
+            std::fs::remove_dir_all(&appdata).unwrap();
+        } else {
+            std::fs::copy(&appdata, &data_path).unwrap();
+            std::fs::remove_file(&appdata).unwrap();
+        }
+    }
+    if !data_path.exists() {
+        std::fs::create_dir_all(&data_path).unwrap();
+    }
+    symlink(&data_path, &appdata).unwrap();
 }

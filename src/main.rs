@@ -89,6 +89,7 @@ async fn main() {
             if let Some(proxy) = proxy {
                 cfg.proxy = proxy;
             }
+            config::link_appdata(&cfg.data);
             cfg.init_path();
             cfg.save();
         }
