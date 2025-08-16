@@ -16,7 +16,9 @@ scoop install code/gdem
 
 ### 主要功能
 
-- 配置管理：设置根目录（`$env:GDEM_ROOT`）、数据源和代理 
+
+- 设置根目录（`$env:GDEM_ROOT`）
+- 配置管理：数据源和代理 
 - 数据同步：从 GodotHub 同步引擎版本数据
 - 引擎列表：查看本地和远程可用的引擎版本
 - 引擎安装：下载并安装指定版本的 Godot 引擎
@@ -44,8 +46,7 @@ cargo build --release
 在使用之前，请先完成以下初始化步骤：
 
 1. 配置根目录：默认 `~/.gdem` 或者通过环境变量 `GDEM_ROOT` 
-2. 初始化配置：`gdem config`
-3. 同步数据：`gdem sync`
+2. 同步数据：`gdem sync`
 
 ![help](./imgs/help.png)
 

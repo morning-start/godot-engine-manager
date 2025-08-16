@@ -18,8 +18,19 @@ pub struct Config {
     pub source: Source,
 }
 impl ConfigTrait for Config {
-    fn new(root: Option<PathBuf>) -> Self {
-        let root = root.unwrap_or_else(Config::get_root);
+    fn init() -> Self {
+        let root = Self::get_root();
+        let config_file = root.join("config.json");
+        // 如果已存在则load，否则创建
+        let cfg = if config_file.exists() {
+            Self::load(root)
+        } else {
+            Self::new(root)
+        };
+        cfg.init_path();
+        cfg
+    }
+    fn new(root: PathBuf) -> Self {
         let home = root.join("home");
         let cache = root.join("cache");
         let data = root.join("data");
@@ -46,8 +57,7 @@ impl ConfigTrait for Config {
         }
     }
 
-    fn load() -> Self {
-        let root = Self::get_root();
+    fn load(root: PathBuf) -> Self {
         let config = load_json(&root.join("config.json")).unwrap();
         let root = Self::val2path(config.get("root"));
         let home = Self::val2path(config.get("home"));

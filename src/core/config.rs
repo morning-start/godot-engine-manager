@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 pub trait ConfigTrait {
     // abstract
     fn get_root() -> PathBuf;
-    fn new(root: Option<PathBuf>) -> Self;
-    fn load() -> Self;
+    fn new(root: PathBuf) -> Self;
+    fn load(root: PathBuf) -> Self;
+    fn init() -> Self;
     fn save(&self);
     fn init_path(&self);
     // mut

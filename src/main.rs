@@ -3,14 +3,13 @@ use gdem::core::config::ConfigTrait;
 use gdem::core::source::Source;
 use gdem::core::style;
 use gdem::func::{config, install, list, remove, switch, sync};
-use std::path::PathBuf;
 
 #[derive(Parser)]
 #[clap(
     name = "gdem",
     version = "1.2.1",
     about = "Godot Engine Manager is a Godot Engine version management tool developed based on the GodotHub.",
-    after_help = "Before using, \n1. please first initialize the configuration with `gdem config`,\n2. then sync the data with `gdem sync`. \n3. Use `--help` to view specific command usage."
+    after_help = "Before using, please first sync the data with `gdem sync`."
 )]
 struct Cli {
     #[clap(subcommand)]
@@ -22,9 +21,6 @@ enum Commands {
     /// Configure the Godot Engine Manager.
     #[clap(name = "config", alias = "cfg")]
     Config {
-        /// The root directory to use.
-        #[clap(short, long, env = "GDEM_ROOT")]
-        root: Option<String>,
         /// The source to use.
         #[clap(short, long)]
         source: Option<String>,
@@ -82,13 +78,8 @@ enum Commands {
 async fn main() {
     let cli = Cli::parse();
     match cli.command {
-        Commands::Config {
-            root,
-            source,
-            proxy,
-        } => {
-            let root = root.map(|r| PathBuf::from(r));
-            let mut cfg = config::Config::new(root);
+        Commands::Config { source, proxy } => {
+            let mut cfg = config::Config::init();
             if let Some(source) = source {
                 cfg.source = Source::from_str(source.as_str());
             }
@@ -96,15 +87,14 @@ async fn main() {
                 cfg.proxy = proxy;
             }
             config::link_appdata(&cfg.data);
-            cfg.init_path();
             cfg.save();
         }
         Commands::Sync {} => {
-            let cfg = config::Config::load();
+            let cfg = config::Config::init();
             sync::sync_data(&cfg).await;
         }
         Commands::List { remote, version } => {
-            let cfg = config::Config::load();
+            let cfg = config::Config::init();
             // 如果都为None，则列出所有本地引擎
             if !remote && version.is_none() {
                 let res = list::list_local_engines(&cfg.home).unwrap();
@@ -133,7 +123,7 @@ async fn main() {
             skip_check,
             self_contained,
         } => {
-            let cfg = config::Config::load();
+            let cfg = config::Config::init();
             match install::full_install_process(&engine, &cfg, force, skip_check, self_contained)
                 .await
             {
@@ -146,7 +136,7 @@ async fn main() {
             };
         }
         Commands::Switch { engine } => {
-            let mut cfg = config::Config::load();
+            let mut cfg = config::Config::init();
             match switch::switch_engine(&engine, &mut cfg) {
                 Ok(engine) => {
                     println!("Switch engine success: {}", engine);
@@ -157,7 +147,7 @@ async fn main() {
             };
         }
         Commands::Remove { engine } => {
-            let mut cfg = config::Config::load();
+            let mut cfg = config::Config::init();
             match remove::remove_engine(&engine, &mut cfg) {
                 Ok(_) => {
                     println!("Remove engine success");
