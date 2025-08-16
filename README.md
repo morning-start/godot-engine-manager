@@ -2,14 +2,31 @@
 
 Godot Engine Manager 是一个基于 [GodotHub](https://godothub.cn/) 开发的 Godot 引擎版本管理工具。
 
+> ！！！
+> 该项目仅在 Windows 平台下测试，其他平台未测试。
+
 ## 功能特性
 
-- 配置管理：设置根目录、数据源和代理
+推荐 scoop 安装
+
+```bash
+scoop bucket add code https://github.com/morning-start/code-bucket
+scoop install code/gdem
+```
+
+### 主要功能
+
+- 配置管理：设置根目录（`$env:GDEM_ROOT`）、数据源和代理 
 - 数据同步：从 GodotHub 同步引擎版本数据
 - 引擎列表：查看本地和远程可用的引擎版本
 - 引擎安装：下载并安装指定版本的 Godot 引擎
 - 引擎切换：在已安装的引擎版本之间切换
 - 引擎删除：删除已安装的引擎版本
+
+### 特性
+
+- 自动处理 APPDATA 下的 `Godot` 目录，转移到 `$env:GDEM_ROOT\data\Godot` 目录下
+- 下载选项支持 self contained 模式
 
 ## 安装
 
@@ -88,7 +105,11 @@ gdem i "Godot_v4.4.1-stable_win64.exe.zip"
 gdem i "Godot_v4.4.1-stable_win64.exe.zip" -f
 
 # 跳过校验安装引擎
-gdem i "Godot_v4.4.1-stable_win64.exe.zip" -s
+gdem i "Godot_v4.4.1-stable_win64.exe.zip" -k
+
+# 自包含模式安装引擎
+gdem i "Godot_v4.4.1-stable_win64.exe.zip" --sc
+
 ```
 
 ### 切换引擎
