@@ -198,20 +198,23 @@ pub async fn full_install_process(
         pb.finish_with_message("Checksum passed");
     }
 
-    let pd = new_spinner();
-    pd.set_message("Extracting");
     let cache_dir = get_levels_dir(&cfg.cache, engine);
     let file_path = cache_dir.join(engine);
-    let home_dir = get_levels_dir(&cfg.home, engine);
-    // filename 去除zip和exe
     let file_name = format_engine_name(engine);
-    let data_path = home_dir.join(&file_name);
-    extract_engine(&file_path, &data_path)?;
-    pd.finish_with_message("Extracting done");
-    if self_contained {
-        // 在data_path中创建一个 _sc_ 空文件
-        let sc_file_path = data_path.join("_sc_");
-        fs::File::create(sc_file_path)?;
+    if file_path.ends_with(".zip") {
+        let pd = new_spinner();
+        pd.set_message("Extracting");
+        let home_dir = get_levels_dir(&cfg.home, engine);
+        // filename 去除zip和exe
+        let data_path = home_dir.join(&file_name);
+        extract_engine(&file_path, &data_path)?;
+        pd.finish_with_message("Extracting done");
+        if self_contained {
+            // 在data_path中创建一个 _sc_ 空文件
+            let sc_file_path = data_path.join("_sc_");
+            fs::File::create(sc_file_path)?;
+        }
     }
+
     Ok(file_name)
 }
