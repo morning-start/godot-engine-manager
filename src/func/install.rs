@@ -87,20 +87,9 @@ async fn check_sha512(
     Ok(remote_sha512 == local_sha512)
 }
 
-async fn install_engine(
-    file_name: &str,
-    cfg: &Config,
-    force: bool,
-) -> Result<String, Box<dyn Error>> {
+async fn install_engine(file_name: &str, cfg: &Config) -> Result<String, Box<dyn Error>> {
     let cache_dir = get_levels_dir(&cfg.cache, file_name);
     let file_path = cache_dir.join(file_name);
-    if file_path.exists() {
-        if force {
-            remove_file(&file_path).await?;
-        } else {
-            return Ok(format!("{} exists", file_name));
-        }
-    }
 
     // 获取下载链接
     let url = query_url(file_name, &cfg.data).unwrap();
@@ -175,12 +164,19 @@ pub async fn full_install_process(
     } else {
         Some(cfg.proxy.as_str())
     };
-    // 获取下载链接
+    let cache_dir = get_levels_dir(&cfg.cache, engine);
+    let file_path = cache_dir.join(engine);
+    let file_name = format_engine_name(engine);
+    if file_path.exists() {
+        if force {
+            remove_file(&file_path).await?;
+        }
+    } // 获取下载链接
     let pb = new_spinner();
 
     // 下载引擎
     pb.set_message("Downloading");
-    let msg = install_engine(engine, cfg, force).await?;
+    let msg = install_engine(engine, cfg).await?;
 
     pb.set_message(msg);
 
@@ -198,9 +194,6 @@ pub async fn full_install_process(
         pb.finish_with_message("Checksum passed");
     }
 
-    let cache_dir = get_levels_dir(&cfg.cache, engine);
-    let file_path = cache_dir.join(engine);
-    let file_name = format_engine_name(engine);
     if file_path.ends_with(".zip") {
         let pd = new_spinner();
         pd.set_message("Extracting");

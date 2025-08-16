@@ -97,7 +97,23 @@ pub async fn download_file(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let client = build_client(proxy_url)?;
 
-    let response = client.get(uri).send().await?;
+    // 检查本地已存在的文件大小
+    let start_pos = if file_path.exists() {
+        let metadata = tokio::fs::metadata(file_path).await?;
+        metadata.len()
+    } else {
+        0
+    };
+
+    // 构建请求，添加Range头以支持断点续传
+    let request = client.get(uri);
+    let request = if start_pos > 0 {
+        request.header("Range", format!("bytes={}-", start_pos))
+    } else {
+        request
+    };
+
+    let response = request.send().await?;
     // let response= response.error_for_status()?;
 
     let total_size = response
@@ -106,6 +122,27 @@ pub async fn download_file(
         .and_then(|h| h.to_str().ok())
         .and_then(|h| h.parse::<u64>().ok())
         .unwrap_or(0);
+
+    // 如果是断点续传，需要获取实际的总文件大小
+    let total_size = if start_pos > 0 {
+        // 从Content-Range头获取总大小
+        if let Some(content_range) = response.headers().get("content-range") {
+            if let Ok(content_range_str) = content_range.to_str() {
+                // 格式: bytes 100-199/200
+                if let Some(total) = content_range_str.split('/').nth(1) {
+                    total.parse::<u64>().unwrap_or(total_size + start_pos)
+                } else {
+                    total_size + start_pos
+                }
+            } else {
+                total_size + start_pos
+            }
+        } else {
+            total_size + start_pos
+        }
+    } else {
+        total_size
+    };
 
     let m = MultiProgress::new();
     let pb = m.add(ProgressBar::new(total_size));
@@ -121,10 +158,17 @@ pub async fn download_file(
         .unwrap_or("unknown"); // 失败时提供默认值
 
     pb.set_message(msg.to_string());
+    pb.set_position(start_pos);
 
-    let mut file = TokioFile::create(file_path).await?;
+    // 以追加模式打开文件
+    let mut file = if start_pos > 0 {
+        TokioFile::options().append(true).open(file_path).await?
+    } else {
+        TokioFile::create(file_path).await?
+    };
+    
     let mut stream = response.bytes_stream();
-    let mut downloaded: u64 = 0;
+    let mut downloaded: u64 = start_pos;
 
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
