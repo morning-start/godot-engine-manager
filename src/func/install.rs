@@ -168,6 +168,7 @@ pub async fn full_install_process(
     cfg: &Config,
     force: bool,
     skip_check: bool,
+    self_contained: bool,
 ) -> Result<String, Box<dyn Error>> {
     let proxy_url = if cfg.proxy.is_empty() {
         None
@@ -207,6 +208,10 @@ pub async fn full_install_process(
     let data_path = home_dir.join(&file_name);
     extract_engine(&file_path, &data_path)?;
     pd.finish_with_message("Extracting done");
-
+    if self_contained {
+        // 在data_path中创建一个 _sc_ 空文件
+        let sc_file_path = data_path.join("_sc_");
+        fs::File::create(sc_file_path)?;
+    }
     Ok(file_name)
 }

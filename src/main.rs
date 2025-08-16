@@ -52,9 +52,15 @@ enum Commands {
         /// Godot_v4.4.1-stable_mono_win64.zip
         engine: String,
         #[clap(short, long)]
+        /// Force install.
         force: bool,
-        #[clap(short = 's', long)]
+        #[clap(short = 'k', long)]
+        /// Skip sha512 check.
         skip_check: bool,
+        /// use self contained mode.
+        /// LINK https://docs.godotengine.org/en/stable/tutorials/io/data_paths.html#editor-data-paths
+        #[clap(short, long, alias = "sc")]
+        self_contained: bool,
     },
     /// Switch the engine.
     #[clap(name = "switch", alias = "sw")]
@@ -125,9 +131,12 @@ async fn main() {
             engine,
             force,
             skip_check,
+            self_contained,
         } => {
             let cfg = config::Config::load();
-            match install::full_install_process(&engine, &cfg, force, skip_check).await {
+            match install::full_install_process(&engine, &cfg, force, skip_check, self_contained)
+                .await
+            {
                 Ok(engine) => {
                     println!("Install engine success: {}", engine);
                 }
