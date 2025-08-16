@@ -138,10 +138,10 @@ async fn main() {
                 .await
             {
                 Ok(engine) => {
-                    println!("Install engine success: {}", engine);
+                    println!("Install success: {}", engine);
                 }
                 Err(msg) => {
-                    eprintln!("Install engine failed: {}", msg);
+                    eprintln!("Install failed: {}", msg);
                 }
             };
         }
