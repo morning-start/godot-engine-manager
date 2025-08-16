@@ -8,7 +8,7 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[clap(
     name = "gdem",
-    version = "1.0.0",
+    version = "1.1.3",
     about = "Godot Engine Manager is a Godot Engine version management tool developed based on the GodotHub.",
     after_help = "Before using, \n1. please first initialize the configuration with `gdem config`,\n2. then sync the data with `gdem sync`. \n3. Use `--help` to view specific command usage."
 )]

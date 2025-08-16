@@ -79,7 +79,6 @@ impl ConfigTrait for Config {
     }
 }
 
-
 /// 递归复制目录
 ///
 /// # Arguments
@@ -120,6 +119,8 @@ pub fn link_appdata(data: &PathBuf) {
         if !appdata.is_symlink() {
             copy_dir_recursively(&appdata, &data_path).unwrap();
             std::fs::remove_dir_all(&appdata).unwrap();
+        } else {
+            return;
         }
     }
     if !data_path.exists() {
