@@ -2,16 +2,25 @@ use crate::core::handler::DocumentHandler;
 use crate::core::tags::is_support_file;
 use crate::core::tags::{Architecture, OS, Tag};
 use crate::core::utils::format_size;
+use crate::func::list::list_remote_engine_assets;
 use regex::Regex;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+pub fn get_asset_name(asset: &str, data: &Path) -> String {
+    let version = extract_version(asset).unwrap();
+    let assets = list_remote_engine_assets(data, &version).unwrap();
+    let asset = assets.iter().find(|a| a.starts_with(asset)).unwrap();
+    asset.to_string()
+}
 
 pub fn format_engine_name(engine: &str) -> String {
     let file_name: String = engine.replace(".zip", "").replace(".exe", "");
     file_name
 }
 
+/// 根据文件，获取层次目录，之和版本相关
 pub fn get_levels_dir(root: &Path, engine: &str) -> PathBuf {
     let version = extract_version(engine).unwrap();
     let major = get_major_from_tag(version.as_str());

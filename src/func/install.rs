@@ -1,10 +1,9 @@
 use crate::core::source::format_url;
 use crate::core::style::new_spinner;
-use crate::core::utils::{download_file, extract_zip, promote_if_single_subdir, sha512sum};
+use crate::core::utils::{download_file, extract_zip, sha512sum};
 use crate::func::config::Config;
-use crate::func::list::list_remote_engine_assets;
 use crate::func::tool::{
-    extract_version, format_engine_name, get_levels_dir, load_remote_engine_assets,
+    format_engine_name, get_asset_name, get_levels_dir, load_remote_engine_assets,
 };
 use std::error::Error;
 use std::fs;
@@ -110,19 +109,6 @@ async fn install_engine(file_name: &str, cfg: &Config) -> Result<String, Box<dyn
     }
 }
 
-pub fn extract_engine(
-    package_path: &Path,
-    target_folder: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // 确保目标文件夹存在
-    std::fs::create_dir_all(target_folder)?;
-    extract_zip(package_path, target_folder)?;
-    // 智能解压，如果target_folder中只有一个文件夹，则优化文件结构
-    //  target_folder/a/  =>  target_folder/
-    promote_if_single_subdir(target_folder)?;
-    Ok(())
-}
-
 /// 完整的引擎安装流程，包括下载和校验
 ///
 /// 该函数执行完整的引擎安装流程，包括下载指定的引擎文件并校验其完整性。
@@ -156,16 +142,13 @@ pub async fn full_install_process(
     cfg: &Config,
     force: bool,
     skip_check: bool,
-    self_contained: bool,
 ) -> Result<String, Box<dyn Error>> {
     let proxy_url = if cfg.proxy.is_empty() {
         None
     } else {
         Some(cfg.proxy.as_str())
     };
-    let version = extract_version(engine).unwrap();
-    let assets = list_remote_engine_assets(&cfg.data, &version).unwrap();
-    let engine = assets.iter().find(|a| a.starts_with(engine)).unwrap();
+    let engine = &get_asset_name(&engine, &cfg.data);
 
     let cache_dir = get_levels_dir(&cfg.cache, engine);
     let file_path = cache_dir.join(engine);
@@ -197,26 +180,59 @@ pub async fn full_install_process(
         pb.finish_with_message("Checksum passed");
     }
 
+    // zip 或 tpz 解压，不同的处理方式。如果要解压，要提供 spinner
     if file_path.to_string_lossy().ends_with(".zip") {
         let pd = new_spinner();
         pd.set_message("Extracting");
-        let home_dir = get_levels_dir(&cfg.home, engine);
-        // filename 去除zip和exe
-        let data_path = home_dir.join(&file_name);
-        extract_engine(&file_path, &data_path)?;
+        extract_engine(&file_path, engine, &cfg.home)?;
         pd.finish_with_message("Extracting done");
-        if self_contained {
-            // 在data_path中创建一个 _sc_ 空文件
-            let sc_file_path = data_path.join("_sc_");
-            fs::File::create(sc_file_path)?;
-        }else {
-            // 如果存在_sc_文件，删除
-            let sc_file_path = data_path.join("_sc_");
-            if sc_file_path.exists() {
-                fs::remove_file(sc_file_path)?;
-            }
-        }
+    } else if file_path.to_string_lossy().ends_with(".tpz") {
+        let pd = new_spinner();
+        pd.set_message("Extracting");
+        extract_template(&file_path, &cfg.data, engine)?;
+        pd.finish_with_message("Extracting done");
     }
-
     Ok(file_name)
+}
+
+fn extract_engine(file_path: &Path, engine: &str, home: &Path) -> Result<(), Box<dyn Error>> {
+    let file_name = format_engine_name(engine);
+    let home_dir = get_levels_dir(home, engine);
+    let target_folder = home_dir.join(&file_name);
+
+    // 确保目标文件夹存在
+    extract_zip(file_path, &target_folder)?;
+
+    // if self_contained {
+    //     // 在data_path中创建一个 _sc_ 空文件
+    //     let sc_file_path = data_path.join("_sc_");
+    //     fs::File::create(sc_file_path)?;
+    // } else {
+    //     // 如果存在_sc_文件，删除
+    //     let sc_file_path = data_path.join("_sc_");
+    //     if sc_file_path.exists() {
+    //         fs::remove_file(sc_file_path)?;
+    //     }
+    // }
+    Ok(())
+}
+
+// TODO 解压导出模板 .tpz  使用 zip 解压。
+// FIXME 问题难点，需要通过 导出模板名 获取对应的 引擎名 来确定 self contained 模式 的路径
+
+fn extract_template(file_path: &Path, data: &Path, file: &str) -> Result<(), Box<dyn Error>> {
+    // file_path  xxx.tpz
+    let target_path = data.join("Godot").join("export_templates");
+
+    // Godot_v3.6.1-stable_mono_export_templates.tpz -> 3.6.1.stable.mono
+    // Godot_v3.6.1-stable_export_templates.tpz -> 3.6.1.stable
+    let template_dir = file
+        .replace("_export_templates.tpz", "")
+        .replace("Godot_v", "")
+        .replace("_", ".")
+        .replace("-", ".");
+    let target_folder = target_path.join(&template_dir);
+
+    extract_zip(file_path, &target_folder)?;
+    Ok(())
 }

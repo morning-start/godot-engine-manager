@@ -26,9 +26,11 @@ pub fn extract_zip(
     zip_file: &Path,
     target_folder: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    std::fs::create_dir_all(&target_folder)?;
     let file = File::open(zip_file)?;
     let mut archive = ZipArchive::new(file)?;
     archive.extract(target_folder)?;
+    promote_if_single_subdir(&target_folder)?;
     Ok(())
 }
 
@@ -206,7 +208,6 @@ pub async fn download_file(
     pb.finish_with_message("✓");
 
     Ok("Download completed".to_string())
-
 }
 
 /// 计算文件的 SHA-256 哈希，返回十六进制字符串

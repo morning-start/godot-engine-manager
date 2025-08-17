@@ -28,8 +28,9 @@ scoop install code/gdem
 ### 特性
 
 - 自动处理 APPDATA 下的 `Godot` 目录，转移到 `$env:GDEM_ROOT\data\Godot` 目录下
-- 下载选项支持 self contained 模式
+- 自动获取系统和架构
 - 支持断点续传，方便大文件下载
+- 自动解压导出模板
 
 ## 安装
 
